@@ -325,12 +325,12 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Related Projects
 
-- [Humanizer MCP Server](https://github.com/yourusername/humanizer-mcp) - Quantum memory system using tetralemma logic
+- [Humanizer MCP Server](https://github.com/temnoon/humanizer-mcp) - Quantum memory system using tetralemma logic
 - [ChatGPT-to-JSON](https://github.com/example/chatgpt-to-json) - Alternative parser approach
 
 ## Acknowledgments
 
-- Built for the [Humanizer](https://github.com/yourusername/humanizer_root) project
+- Built for the [Humanizer](https://github.com/temnoon/humanizer_root) project
 - Inspired by the need for robust ChatGPT archive analysis
 - Thanks to the OpenAI community for format documentation
 
