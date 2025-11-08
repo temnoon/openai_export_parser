@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# ALL USER DATA - DO NOT COMMIT
+# Output directories (contain parsed conversations)
+output*/
+
+# Temporary extraction directories
+_tmp/
+
+# All logs (may contain conversation metadata)
+*.log
+
+# Recovered files (user's personal media)
+recovered_files/
+
+# All CSV reports (contain conversation/message data)
+*.csv
+
+# Missing file lists (contain file hashes from user's data)
+missing_file_hashes.txt
+
+# Recovery scripts with hardcoded paths
+recover_missing_files.sh
+recovery.log
+
+# Any actual OpenAI export files
+*.zip
+OpenAI-export.zip
+
+# Session handoff documents (contain user-specific stats)
+HANDOFF_*.md
+
+# Any analysis scripts that might reference user data
+generate_unmatched_report.py
+extract_unmatched_from_log.py
+extract_unmatched_with_context.py
+create_unmatched_report_from_source.py
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test files
+test_*.py
+*_test.py

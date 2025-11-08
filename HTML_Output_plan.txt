@@ -1,0 +1,148 @@
+ Here is Claude's plan:
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ HTML Viewer for OpenAI Export Parser
+
+ Overview
+
+ Create a fully local, portable HTML viewer system that renders conversation JSON files
+ with Markdown, LaTeX math, and media support.
+
+ Architecture: Standalone HTML (No Server Required)
+
+ Approach: Embed JSON data directly in HTML files to avoid CORS issues with file://
+ protocol.
+
+ Technical Stack
+
+ 1. Markdown Rendering: marked.js (lightweight, fast, extensible)
+ 2. LaTeX Math: KaTeX (faster than MathJax, better for static rendering)
+ 3. Code Highlighting: highlight.js (for code blocks in assets/canvas)
+ 4. Libraries: CDN links (allows offline copy if needed)
+
+ File Structure
+
+ output_v7_final/
+ ├── index.html                  # Master index (lists all conversations)
+ ├── _with_media/               # Symlinks
+ ├── _with_assets/              # Symlinks
+ ├── 2024-01-15_Title_00001/
+ │   ├── conversation.json
+ │   ├── conversation.html      # NEW: Standalone viewer
+ │   ├── media/
+ │   └── assets/
+ └── viewer/                     # NEW: Shared viewer components (optional)
+     ├── viewer-template.html
+     └── styles.css
+
+ Implementation Plan
+
+ Phase 1: Python Generator Module
+
+ Create html_generator.py to generate HTML files during parsing:
+
+ 1. Template System:
+   - Create reusable HTML template with embedded JavaScript
+   - Inline conversation JSON as JavaScript variable (avoids CORS)
+   - Include all rendering libraries via CDN
+ 2. Conversation HTML:
+   - Each conversation gets standalone conversation.html
+   - JSON embedded as: <script>const conversationData = {...}</script>
+   - Renders on page load with JavaScript
+   - Links to media/ and assets/ using relative paths
+ 3. Master Index:
+   - Generate index.html listing all conversations
+   - Show title, date, message count, media/asset indicators
+   - Links to individual conversation HTML files
+   - Filterable/searchable interface
+
+ Phase 2: Rendering Features
+
+ 1. Markdown Rendering:
+   - Use marked.js with GFM (GitHub Flavored Markdown)
+   - Support headings, bold, italic, lists, code blocks, tables
+   - Escape HTML to prevent XSS
+ 2. LaTeX Math:
+   - Configure KaTeX with custom delimiters
+   - Support: \[...\], \(...\), $$...$$, $...$
+   - Pre-process to avoid Markdown conflicts (escape $ in code blocks)
+ 3. Media Handling:
+   - Images: <img src="media/{filename}">
+   - Audio: <audio controls>
+   - PDFs: Link with preview option
+   - Relative paths ensure portability
+ 4. Assets Rendering:
+   - Code blocks: Syntax highlighted with highlight.js
+   - Canvas artifacts: Collapsible sections
+   - Markdown files: Rendered inline
+
+ Phase 3: UI/UX
+
+ 1. Conversation View:
+   - Message threading (show parent/child relationships)
+   - User vs Assistant message styling
+   - Timestamps and metadata
+   - Expandable tool calls/results
+ 2. Navigation:
+   - Back to index button
+   - Previous/Next conversation links
+   - Scroll to message anchors
+ 3. Styling:
+   - Clean, readable design
+   - Dark mode toggle (localStorage)
+   - Responsive layout
+   - Print-friendly CSS
+
+ LaTeX Delimiter Handling Strategy
+
+ Challenge: $ conflicts with Markdown and plain text
+
+ Solution:
+ // 1. Extract and protect code blocks first
+ // 2. Process LaTeX with priority order:
+ //    - \[...\] and \(...\) (safest, no conflicts)
+ //    - $$...$$ (block math)
+ //    - $...$ (inline, but check for false positives)
+ // 3. Render Markdown
+ // 4. Restore code blocks
+ // 5. Render LaTeX with KaTeX
+
+ Portability Strategy
+
+ - No absolute paths: All links use relative paths
+ - Embedded data: JSON inlined in HTML (no external JSON loading)
+ - CDN libraries: Optional - can bundle for offline use
+ - Works anywhere: Copy single conversation folder → still works
+
+ Integration with Parser
+
+ Modify conversation_organizer.py:
+ def write_organized_output():
+     # ... existing code ...
+
+     # NEW: Generate HTML for each conversation
+     html_content = html_generator.generate_conversation_html(
+         conversation=conv,
+         media_files=media_list,
+         assets=assets_list
+     )
+     html_path = os.path.join(dest_folder, 'conversation.html')
+     with open(html_path, 'w') as f:
+         f.write(html_content)
+
+ Estimated Scope
+
+ - Core HTML generator: ~200 lines Python
+ - HTML/JS template: ~400 lines (template + rendering logic)
+ - Master index generator: ~100 lines Python
+ - Styling: ~200 lines CSS
+
+ Total: Can be completed in 1-2 sessions
+
+ Next Steps
+
+ 1. Create html_generator.py module
+ 2. Design HTML template with embedded rendering
+ 3. Test with sample conversations
+ 4. Generate index.html
+ 5. Polish UI/UX and styling
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌

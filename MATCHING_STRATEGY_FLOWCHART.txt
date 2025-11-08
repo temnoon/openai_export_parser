@@ -1,0 +1,334 @@
+MEDIA MATCHING STRATEGY FLOWCHART
+═════════════════════════════════════════════════════════════════════════════
+
+INPUT: conversations + media_files + indices
+       └─ file_id_index
+       └─ file_hash_index  
+       └─ size_index
+       └─ media_index
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STRATEGY 1: Conversation ID Matching (Lines 100-127)                     │
+├──────────────────────────────────────────────────────────────────────────┤
+│ IF: media_index provided                                                 │
+│                                                                           │
+│ For each conversation:                                                   │
+│   conv_id = conv["conversation_id"] or conv["id"]                        │
+│   IF conv_id in media_index:                                             │
+│     ✓ Match all files in media_index[conv_id]                           │
+│     Store in conv["_media_files"]                                       │
+│     Add basenames to first message["media"]                              │
+│   ELSE:                                                                   │
+│     × No match for this conversation                                     │
+│                                                                           │
+│ Reliability: 99.9% (directory structure)                                 │
+│ File Types: DALL-E images, newer generated images                        │
+│ Paths Matched: /conversations/{uuid}/image.png                           │
+└──────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STRATEGY 2: File-ID Matching (Lines 129-167)                             │
+├──────────────────────────────────────────────────────────────────────────┤
+│ IF: file_id_index provided                                               │
+│                                                                           │
+│ For each conversation, scan mapping -> messages:                          │
+│   For each message.metadata.attachments[]:                               │
+│     file_id = attachment["id"]  ← File-BTGHeayl9isKTp9kvyBzirg0         │
+│     IF file_id:                                                           │
+│       IF file_id in file_id_index:                                       │
+│         ✓ Match file from file_id_index[file_id]                        │
+│         Add to conv["_media_files"]                                      │
+│       ELSE:                                                               │
+│         × File-ID not in index (missing/deleted file)                    │
+│                                                                           │
+│ Reliability: 99.5% (exact ID matching)                                   │
+│ File Types: User-uploaded files (PDFs, images, etc.)                     │
+│ Filenames Matched: file-{ID}_{name}.ext or file-{ID}-{name}.ext         │
+│                                                                           │
+│ FAILURE CASES:                                                            │
+│   - metadata.attachments missing                                         │
+│   - attachment.id is null/undefined                                      │
+│   - File doesn't have file-{ID}_ prefix                                  │
+└──────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STRATEGY 3: File-Hash Matching (Lines 169-212)                           │
+├──────────────────────────────────────────────────────────────────────────┤
+│ IF: file_hash_index provided                                             │
+│                                                                           │
+│ For each conversation, scan content.parts[]:                             │
+│   asset_pointer = part["asset_pointer"]                                  │
+│   IF asset_pointer.startswith("sediment://"):                            │
+│     file_hash = asset_pointer.replace("sediment://", "")                 │
+│     # file_hash = "file_000000009e586230866e2a177650b0e8"               │
+│     IF file_hash in file_hash_index:                                     │
+│       ✓ Match file from file_hash_index[file_hash]                      │
+│       Add to conv["_media_files"]                                        │
+│     ELSE:                                                                 │
+│       × Hash not in index                                                │
+│                                                                           │
+│ Reliability: 99.9% (hash-based)                                          │
+│ File Types: DALL-E images, newer generated content                       │
+│ Expected Asset Pointer: sediment://file_{32hex}                          │
+│ Filenames Indexed: file_{32hex}-{uuid}.ext                               │
+│                                                                           │
+│ FAILURE CASES:                                                            │
+│   - asset_pointer missing or doesn't start with sediment://             │
+│   - File hash doesn't match anything in index                            │
+└──────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STRATEGY 4: Size-Based Matching (Lines 214-326)                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│ IF: size_index provided                                                  │
+│                                                                           │
+│ TWO-PASS ALGORITHM:                                                       │
+│                                                                           │
+│ PASS 1: Build reverse map size_gen_id_map (size, gen_id) -> file_path   │
+│   For each conversation, scan content.parts[]:                          │
+│     IF asset_pointer.startswith("file-service://"):                      │
+│       IF metadata.dalle exists:  ← MUST have dalle metadata              │
+│         file_size = part["size_bytes"]                                   │
+│         gen_id = metadata.dalle["gen_id"]                                │
+│         matching_files = size_index[file_size]                           │
+│         IF len(matching_files) == 1:                                     │
+│           size_gen_id_map[(file_size, gen_id)] = matching_files[0]      │
+│         ELIF len(matching_files) > 1:  ← Collision case                 │
+│           size_gen_id_map[(file_size, gen_id)] = matching_files[0]      │
+│                                                                           │
+│ PASS 2: Match to conversations                                           │
+│   For each conversation, scan content.parts[]:                          │
+│     IF asset_pointer.startswith("file-service://") AND dalle exists:    │
+│       file_size = part["size_bytes"]                                     │
+│       gen_id = metadata.dalle["gen_id"]                                  │
+│       IF (file_size, gen_id) in size_gen_id_map:                         │
+│         ✓ Match using gen_id (best accuracy)                            │
+│       ELIF file_size in size_index:                                      │
+│         ✓ Match using size only (fallback)                              │
+│                                                                           │
+│ Reliability: 99.8% with gen_id (2 collisions in 1,222 files)             │
+│ File Types: DALL-E generation files                                      │
+│ Stored In: dalle-generations/ folders                                    │
+│ Location: /dalle-generations/uuid_files                                  │
+│                                                                           │
+│ FAILURE CASES:                                                            │
+│   - No dalle metadata (means not a generation)                           │
+│   - size_bytes missing                                                   │
+│   - Multiple files with same size + no gen_id match                      │
+│   - File not in dalle-generations/ folder                                │
+└──────────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ STRATEGY 5: Text Content Matching (Lines 328-363) - FALLBACK             │
+├──────────────────────────────────────────────────────────────────────────┤
+│ IF: ALL of the above indices are absent/empty                            │
+│     (only used if strategies 1-4 had nothing to do)                      │
+│                                                                           │
+│ For each conversation.messages[]:                                        │
+│   msg_str = str(msg)  ← Convert entire message dict to string            │
+│   For each media_file:                                                   │
+│     fname = os.path.basename(media_file)                                 │
+│     matched = False                                                       │
+│                                                                           │
+│     TRY 1: Direct filename match                                         │
+│       IF fname in msg_str:                                               │
+│         ✓ matched = True                                                │
+│                                                                           │
+│     TRY 2: File-ID pattern match                                         │
+│       FOR file_id in FILE_ID_PATTERN.findall(msg_str):                  │
+│         IF file_id in fname:                                             │
+│           ✓ matched = True                                              │
+│           break                                                           │
+│                                                                           │
+│     TRY 3: UUID pattern match                                            │
+│       FOR uuid in UUID_PATTERN.findall(msg_str):                         │
+│         IF uuid in fname:                                                │
+│           ✓ matched = True                                              │
+│           break                                                           │
+│                                                                           │
+│     IF matched:                                                           │
+│       msg.setdefault("media", []).append(fname)                          │
+│                                                                           │
+│ Reliability: 50-70% (text-dependent, prone to false positives)           │
+│ Requirement: Explicit text reference to filename/ID/UUID                 │
+│ Examples:                                                                 │
+│   SUCCESS:  "Here's file file-abc123xyz" → file-abc123xyz_doc.pdf       │
+│   FAILURE:  File exists but not mentioned in text                        │
+│                                                                           │
+│ WHEN USED:                                                                │
+│   - Only when all structured indices (1-4) are empty                     │
+│   - Last resort strategy                                                 │
+└──────────────────────────────────────────────────────────────────────────┘
+
+
+FILE-ID MATCHING DETAILED FLOW
+════════════════════════════════════════════════════════════════════════════
+
+For file-ID like "file-BTGHeayl9isKTp9kvyBzirg0":
+
+STEP 1: Index Building (MediaIndexer)
+       Scan all filenames in extracted directory
+       ┌─────────────────────────────────────────────────────────────┐
+       │ File: file-BTGHeayl9isKTp9kvyBzirg0_document.pdf           │
+       │                                                             │
+       │ Extract using regex: (file-[A-Za-z0-9]+)[_-]              │
+       │ Result: file-BTGHeayl9isKTp9kvyBzirg0                      │
+       │                                                             │
+       │ Store in file_id_index:                                    │
+       │   {                                                         │
+       │     "file-BTGHeayl9isKTp9kvyBzirg0":                       │
+       │       "/path/to/file-BTGHeayl9isKTp9kvyBzirg0_document.pdf"│
+       │   }                                                         │
+       └─────────────────────────────────────────────────────────────┘
+
+STEP 2: Matching (MediaMatcher._match_by_file_id)
+       Read conversation data
+       ┌─────────────────────────────────────────────────────────────┐
+       │ {                                                           │
+       │   "mapping": {                                              │
+       │     "node-abc": {                                           │
+       │       "message": {                                          │
+       │         "metadata": {                                       │
+       │           "attachments": [                                  │
+       │             {                                               │
+       │               "id": "file-BTGHeayl9isKTp9kvyBzirg0",       │ ← LOOKUP
+       │               "name": "document.pdf"                        │
+       │             }                                               │
+       │           ]                                                 │
+       │         }                                                   │
+       │       }                                                     │
+       │     }                                                       │
+       │   }                                                         │
+       │ }                                                           │
+       │                                                             │
+       │ Look up: file_id_index["file-BTGHeayl9isKTp9kvyBzirg0"]   │
+       │ Result: "/path/to/file-BTGHeayl9isKTp9kvyBzirg0_document" │
+       │                                                             │
+       │ Add to conversation:                                        │
+       │ conv["_media_files"].add("/path/to/file-...")             │
+       │                                                             │
+       │ Success count: +1 (file_id_matches stat)                  │
+       └─────────────────────────────────────────────────────────────┘
+
+STEP 3: Output
+       Files stored in conv["_media_files"] for later processing
+
+
+IMAGE REFERENCE GAPS AND MISSING LOGIC
+════════════════════════════════════════════════════════════════════════════
+
+GAP #1: Missing metadata.attachments
+┌────────────────────────────────────────────┐
+│ Message in Conversation:                   │
+│ {                                          │
+│   "message": {                             │
+│     "content": "Here's my image",         │
+│     "metadata": {}  ← EMPTY!               │
+│   }                                        │
+│ }                                          │
+│                                            │
+│ File on Disk:                              │
+│ file-BTG..._photo.png                      │
+│                                            │
+│ MATCHING RESULT: ✗ NO MATCH                │
+│                                            │
+│ WHY: Strategy 2 only checks                │
+│      metadata.attachments[] which is empty │
+│                                            │
+│ MISSING CHECK: content.parts[].image_url  │
+└────────────────────────────────────────────┘
+
+GAP #2: Images in content.parts[] without asset_pointer
+┌────────────────────────────────────────────┐
+│ Message in Conversation:                   │
+│ {                                          │
+│   "content": {                             │
+│     "parts": [                             │
+│       {                                    │
+│         "type": "image",                   │
+│         "image_url": "file-abc123.png"    │ ← NOT CHECKED!
+│       }                                    │
+│     ]                                      │
+│   }                                        │
+│ }                                          │
+│                                            │
+│ File on Disk:                              │
+│ file-abc123_photo.png                      │
+│                                            │
+│ MATCHING RESULT: ✗ NO MATCH                │
+│                                            │
+│ WHY: Strategies 3 & 4 only check           │
+│      asset_pointer field with specific     │
+│      prefixes (sediment://, file-service://)│
+│                                            │
+│ MISSING CHECK: image_url field extraction  │
+└────────────────────────────────────────────┘
+
+GAP #3: Images without directory structure
+┌────────────────────────────────────────────┐
+│ File Structure:                            │
+│ /downloaded_images/                        │
+│   file-BTG..._photo.png                    │
+│   ↑ NOT in /conversations/{uuid}/          │
+│                                            │
+│ MATCHING RESULT: ✗ NO MATCH                │
+│                                            │
+│ WHY: Strategy 1 requires:                  │
+│      /conversations/[uuid]/ in path        │
+│                                            │
+│ Falls back to Strategy 2 which needs       │
+│ metadata.attachments (often missing)       │
+└────────────────────────────────────────────┘
+
+GAP #4: DALL-E without dalle metadata
+┌────────────────────────────────────────────┐
+│ Message in Conversation:                   │
+│ {                                          │
+│   "content": {                             │
+│     "parts": [                             │
+│       {                                    │
+│         "asset_pointer":                   │
+│           "file-service://...",            │
+│         "size_bytes": 65536,               │
+│         "metadata": {}  ← NO dalle!        │
+│       }                                    │
+│     ]                                      │
+│   }                                        │
+│ }                                          │
+│                                            │
+│ File on Disk:                              │
+│ dalle-generations/uuid_filename            │
+│                                            │
+│ MATCHING RESULT: ✗ NO MATCH                │
+│                                            │
+│ WHY: Strategy 4 explicitly checks          │
+│      dalle = metadata.get("dalle", {})     │
+│      if dalle:  ← Requires dalle present   │
+│                                            │
+│ Can't use gen_id tiebreaker, risky         │
+└────────────────────────────────────────────┘
+
+GAP #5: Text-only references
+┌────────────────────────────────────────────┐
+│ Message in Conversation:                   │
+│ {                                          │
+│   "content": "I uploaded photo.jpg"       │
+│   "metadata": {}                           │
+│   "content": { "parts": [] }               │
+│ }                                          │
+│                                            │
+│ File on Disk:                              │
+│ file-BTG...xyz_photo.jpg                   │
+│                                            │
+│ MATCHING RESULT: ✗ NO MATCH                │
+│                                            │
+│ WHY: Strategy 5 (text matching) only       │
+│      activates if ALL indices 1-4 absent   │
+│      Requires exact filename match         │
+│      "photo.jpg" is not in "file-BTG...xyz"│
+└────────────────────────────────────────────┘
+
