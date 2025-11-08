@@ -330,7 +330,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- Built for the [Humanizer](https://github.com/yourusername/humanizer-mcp) project
+- Built for the [Humanizer](https://github.com/yourusername/humanizer_root) project
 - Inspired by the need for robust ChatGPT archive analysis
 - Thanks to the OpenAI community for format documentation
 
