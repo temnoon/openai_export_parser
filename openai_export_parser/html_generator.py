@@ -367,6 +367,28 @@ class HTMLGenerator:
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
+        .audio-message {
+            margin: 1em 0;
+            padding: 12px;
+            background-color: var(--code-bg);
+            border-radius: 8px;
+            border: 1px solid var(--table-border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .audio-message audio {
+            flex: 1;
+            height: 32px;
+        }
+
+        .audio-duration {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            white-space: nowrap;
+        }
+
         .message-content a {
             color: var(--accent-color);
             text-decoration: none;
@@ -802,6 +824,59 @@ class HTMLGenerator:
                     if (typeof part === 'string') {
                         let text = processLatex(part);
                         html += marked.parse(text);
+                    } else if (part && part.content_type === 'audio_transcription') {
+                        // Render audio transcript text
+                        const transcriptText = part.text || '';
+                        const direction = part.direction || '';
+                        if (transcriptText) {
+                            let text = processLatex(transcriptText);
+                            html += marked.parse(text);
+                        }
+                    } else if (part && part.content_type === 'audio_asset_pointer') {
+                        // Render audio player for assistant audio
+                        const assetPointer = part.asset_pointer || '';
+                        const format = part.format || 'audio';
+                        const metadata = part.metadata || {};
+                        const duration = metadata.end || 0;
+
+                        // Extract file hash from sediment:// URLs
+                        const fileHashMatch = assetPointer.match(/sediment:\\/\\/(file_[a-f0-9]+)/);
+                        const fileHash = fileHashMatch ? fileHashMatch[1] : '';
+
+                        // Find the audio file
+                        let audioFile = null;
+                        if (fileHash) {
+                            audioFile = mediaFiles.find(f => f.includes(fileHash));
+                        }
+
+                        if (audioFile) {
+                            const durationText = duration > 0 ? ` (${Math.round(duration)}s)` : '';
+                            html += `<div class="audio-message"><audio controls preload="metadata"><source src="media/${audioFile}" type="audio/${format}">Your browser does not support audio playback.</audio><span class="audio-duration">${durationText}</span></div>`;
+                        }
+                    } else if (part && part.content_type === 'real_time_user_audio_video_asset_pointer') {
+                        // Render audio player for user audio in real-time conversations
+                        const audioPointer = part.audio_asset_pointer;
+                        if (audioPointer) {
+                            const assetPointer = audioPointer.asset_pointer || '';
+                            const format = audioPointer.format || 'audio';
+                            const metadata = audioPointer.metadata || {};
+                            const duration = metadata.end || 0;
+
+                            // Extract file hash from sediment:// URLs
+                            const fileHashMatch = assetPointer.match(/sediment:\\/\\/(file_[a-f0-9]+)/);
+                            const fileHash = fileHashMatch ? fileHashMatch[1] : '';
+
+                            // Find the audio file
+                            let audioFile = null;
+                            if (fileHash) {
+                                audioFile = mediaFiles.find(f => f.includes(fileHash));
+                            }
+
+                            if (audioFile) {
+                                const durationText = duration > 0 ? ` (${Math.round(duration)}s)` : '';
+                                html += `<div class="audio-message"><audio controls preload="metadata"><source src="media/${audioFile}" type="audio/${format}">Your browser does not support audio playback.</audio><span class="audio-duration">${durationText}</span></div>`;
+                            }
+                        }
                     } else if (part && part.content_type === 'image_asset_pointer') {
                         // Get the asset pointer and extract identifiers
                         const assetPointer = part.asset_pointer || '';
