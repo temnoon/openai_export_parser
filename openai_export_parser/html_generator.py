@@ -121,15 +121,22 @@ class HTMLGenerator:
     </div>
 
     <!-- Embedded Conversation Data -->
-    <script>
-        const conversationData = {conv_json};
-        const mediaFiles = {json.dumps(media_files)};
-        const assetFiles = {json.dumps(assets)};
-        const mediaMapping = {json.dumps(media_mapping)};
-        const assetPointerMap = {json.dumps(asset_pointer_map)};
-    </script>
+    <script id="conversation-data" type="application/json">{conv_json}</script>
+    <script id="media-files-data" type="application/json">{json.dumps(media_files)}</script>
+    <script id="asset-files-data" type="application/json">{json.dumps(assets)}</script>
+    <script id="media-mapping-data" type="application/json">{json.dumps(media_mapping)}</script>
+    <script id="asset-pointer-map-data" type="application/json">{json.dumps(asset_pointer_map)}</script>
 
     <!-- Rendering Script -->
+    <script>
+        // Load JSON data from script tags
+        const conversationData = JSON.parse(document.getElementById('conversation-data').textContent);
+        const mediaFiles = JSON.parse(document.getElementById('media-files-data').textContent);
+        const assetFiles = JSON.parse(document.getElementById('asset-files-data').textContent);
+        const mediaMapping = JSON.parse(document.getElementById('media-mapping-data').textContent);
+        const assetPointerMap = JSON.parse(document.getElementById('asset-pointer-map-data').textContent);
+    </script>
+
     <script>
 {self._get_javascript()}
     </script>
