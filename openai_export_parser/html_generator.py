@@ -1320,7 +1320,7 @@ class HTMLGenerator:
 
     def generate_index_html(self, conversations, output_dir):
         """
-        Generate master index.html listing all conversations.
+        Generate master index.html listing all conversations with enhanced filtering.
 
         Args:
             conversations: List of conversation dicts
@@ -1329,22 +1329,60 @@ class HTMLGenerator:
         Returns:
             HTML string
         """
-        # Build conversation list with metadata
+        # Build conversation list with extended metadata
         conv_list = []
         for conv in conversations:
             title = conv.get('title', 'Untitled')
             create_time = conv.get('create_time')
             conv_id = conv.get('conversation_id') or conv.get('id', 'unknown')
 
-            # Count messages
+            # Count messages and calculate metrics
             mapping = conv.get('mapping', {})
-            message_count = sum(1 for node in mapping.values() if node.get('message'))
+            message_count = 0
+            total_words = 0
+            code_block_count = 0
+            all_text = []  # For full-text search
+
+            for node in mapping.values():
+                msg = node.get('message')
+                if not msg:
+                    continue
+
+                message_count += 1
+                content = msg.get('content', {})
+
+                # Extract text content
+                if content.get('content_type') == 'text':
+                    parts = content.get('parts', [])
+                    for part in parts:
+                        if isinstance(part, str):
+                            all_text.append(part.lower())
+                            words = part.split()
+                            total_words += len(words)
+                            # Count code blocks
+                            code_block_count += part.count('```') // 2
+
+                # Also check multimodal_text for audio transcripts etc
+                elif content.get('content_type') == 'multimodal_text':
+                    parts = content.get('parts', [])
+                    for part in parts:
+                        if isinstance(part, str):
+                            all_text.append(part.lower())
+                            total_words += len(part.split())
+                        elif isinstance(part, dict) and part.get('content_type') == 'audio_transcription':
+                            text = part.get('text', '')
+                            if text:
+                                all_text.append(text.lower())
+                                total_words += len(text.split())
+
+            # Calculate code percentage
+            code_percentage = (code_block_count / message_count * 100) if message_count > 0 else 0
 
             # Check for media/assets
             has_media = bool(conv.get('_media_files'))
-            has_assets = '_assets' in conv  # Will be set by organizer
+            has_assets = '_assets' in conv
 
-            # Get folder name (will be set by organizer)
+            # Get folder name
             folder_name = conv.get('_folder_name', '')
 
             if folder_name:
@@ -1353,30 +1391,46 @@ class HTMLGenerator:
                     'folder_name': folder_name,
                     'create_time': create_time,
                     'message_count': message_count,
+                    'word_count': total_words,
+                    'code_percentage': code_percentage,
                     'has_media': has_media,
                     'has_assets': has_assets,
-                    'conv_id': conv_id
+                    'conv_id': conv_id,
+                    'search_text': ' '.join(all_text)  # Combined text for searching
                 })
 
         # Sort by create_time (newest first)
         conv_list.sort(key=lambda x: x['create_time'] or 0, reverse=True)
 
-        # Generate HTML
+        # Serialize conversation data for JavaScript
+        import json as json_lib
+        conversations_json = json_lib.dumps(conv_list, ensure_ascii=False)
+
+        # Generate HTML cards (JavaScript will handle filtering)
         conversations_html = ''
         for conv in conv_list:
             date_str = self._format_timestamp(conv['create_time']) if conv['create_time'] else 'Unknown'
             media_badge = '🖼️ Media' if conv['has_media'] else ''
             assets_badge = '📄 Assets' if conv['has_assets'] else ''
+            code_badge = f'💻 {conv["code_percentage"]:.0f}% code' if conv['code_percentage'] > 20 else ''
 
             conversations_html += f'''
-                <div class="conversation-card">
+                <div class="conversation-card"
+                     data-messages="{conv['message_count']}"
+                     data-words="{conv['word_count']}"
+                     data-code="{conv['code_percentage']:.1f}"
+                     data-timestamp="{conv['create_time'] or 0}"
+                     data-has-media="{str(conv['has_media']).lower()}"
+                     data-has-assets="{str(conv['has_assets']).lower()}">
                     <a href="{conv['folder_name']}/conversation.html" class="conversation-link">
                         <h3>{self._escape_html(conv['title'])}</h3>
                         <div class="conversation-meta">
                             <span>📅 {date_str}</span>
                             <span>💬 {conv['message_count']} messages</span>
+                            <span>📝 {conv['word_count']:,} words</span>
                             {f'<span class="badge">{media_badge}</span>' if media_badge else ''}
                             {f'<span class="badge">{assets_badge}</span>' if assets_badge else ''}
+                            {f'<span class="badge code-badge">{code_badge}</span>' if code_badge else ''}
                         </div>
                     </a>
                 </div>
@@ -1410,14 +1464,54 @@ class HTMLGenerator:
         <header>
             <h1>📚 OpenAI Conversation Export</h1>
             <div class="stats">
-                <span>Total Conversations: {len(conv_list)}</span>
-                <span>With Media: {sum(1 for c in conv_list if c['has_media'])}</span>
-                <span>With Assets: {sum(1 for c in conv_list if c['has_assets'])}</span>
+                <span id="stat-total">Total: {len(conv_list)}</span>
+                <span id="stat-showing">Showing: {len(conv_list)}</span>
+                <span>Media: {sum(1 for c in conv_list if c['has_media'])}</span>
+                <span>Assets: {sum(1 for c in conv_list if c['has_assets'])}</span>
             </div>
-            <div class="filters">
-                <input type="text" id="search" placeholder="🔍 Search conversations..." oninput="filterConversations()">
-                <button onclick="toggleDarkMode()" class="btn-dark-mode">🌓 Toggle Theme</button>
+
+            <div class="search-section">
+                <div class="search-input-container">
+                    <input type="text" id="search" placeholder="🔍 Search title or content..." autocomplete="off">
+                    <button onclick="clearSearch()" class="btn-clear" title="Clear search">✕</button>
+                </div>
+                <div id="search-history" class="search-history"></div>
             </div>
+
+            <details class="filters-panel">
+                <summary>🔍 Advanced Filters</summary>
+                <div class="filters-grid">
+                    <div class="filter-group">
+                        <label>Messages</label>
+                        <input type="number" id="filter-messages-min" placeholder="Min" min="0">
+                        <input type="number" id="filter-messages-max" placeholder="Max" min="0">
+                    </div>
+                    <div class="filter-group">
+                        <label>Words</label>
+                        <input type="number" id="filter-words-min" placeholder="Min" min="0">
+                        <input type="number" id="filter-words-max" placeholder="Max" min="0">
+                    </div>
+                    <div class="filter-group">
+                        <label>Date Range</label>
+                        <input type="date" id="filter-date-start">
+                        <input type="date" id="filter-date-end">
+                    </div>
+                    <div class="filter-group">
+                        <label>
+                            <input type="checkbox" id="filter-exclude-code"> Exclude code-heavy (>50%)
+                        </label>
+                        <label>
+                            <input type="checkbox" id="filter-has-media"> Has media only
+                        </label>
+                    </div>
+                    <div class="filter-actions">
+                        <button onclick="applyFilters()" class="btn-apply">Apply Filters</button>
+                        <button onclick="resetFilters()" class="btn-reset">Reset</button>
+                    </div>
+                </div>
+            </details>
+
+            <button onclick="toggleDarkMode()" class="btn-dark-mode">🌓 Toggle Theme</button>
         </header>
 
         <main id="conversations-container">
@@ -1425,9 +1519,14 @@ class HTMLGenerator:
         </main>
 
         <footer>
-            <p>Generated by <a href="https://github.com/anthropics/openai-export-parser" target="_blank">OpenAI Export Parser</a></p>
+            <p>Generated by <a href="https://github.com/temnoon/openai-export-parser" target="_blank">OpenAI Export Parser</a></p>
         </footer>
     </div>
+
+    <!-- Embedded conversation data for JavaScript filtering -->
+    <script id="conversations-data" type="application/json">
+{conversations_json}
+    </script>
 
     <script>
 {self._get_index_javascript()}
@@ -1537,6 +1636,148 @@ class HTMLGenerator:
             color: white;
         }
 
+        /* Enhanced filter UI styles */
+        .search-section {
+            margin-bottom: 20px;
+        }
+
+        .search-input-container {
+            position: relative;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-clear {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 5px 10px;
+        }
+
+        .btn-clear:hover {
+            color: var(--text-primary);
+        }
+
+        .search-history {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 20px;
+        }
+
+        .search-history-item {
+            padding: 5px 12px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .search-history-item:hover {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .filters-panel {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .filters-panel summary {
+            cursor: pointer;
+            font-weight: 600;
+            padding: 5px;
+            user-select: none;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .filter-group label {
+            font-weight: 500;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .filter-group input[type="number"],
+        .filter-group input[type="date"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9em;
+        }
+
+        .filter-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .btn-apply, .btn-reset {
+            padding: 10px 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+
+        .btn-apply {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .btn-apply:hover {
+            opacity: 0.9;
+        }
+
+        .btn-reset {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .btn-reset:hover {
+            background-color: var(--border-color);
+        }
+
+        .code-badge {
+            background-color: #9c27b0;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+
         main {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -1621,25 +1862,208 @@ class HTMLGenerator:
         '''
 
     def _get_index_javascript(self):
-        """Get JavaScript for index page."""
+        """Get JavaScript for index page with enhanced filtering."""
         return '''
+        // Load conversation data
+        const conversationsData = JSON.parse(document.getElementById('conversations-data').textContent);
+        const MAX_SEARCH_HISTORY = 10;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSearchHistory();
+            restoreLastSearch();
+            setupSearchInput();
+        });
+
         function toggleDarkMode() {
             document.documentElement.classList.toggle('dark-mode');
             const isDark = document.documentElement.classList.contains('dark-mode');
             localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
         }
 
+        function setupSearchInput() {
+            const searchInput = document.getElementById('search');
+            let searchTimeout;
+
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    filterConversations();
+                    saveCurrentSearch();
+                }, 300);  // Debounce search
+            });
+
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const searchTerm = searchInput.value.trim();
+                    if (searchTerm) {
+                        addToSearchHistory(searchTerm);
+                    }
+                }
+            });
+        }
+
         function filterConversations() {
             const searchTerm = document.getElementById('search').value.toLowerCase();
             const cards = document.querySelectorAll('.conversation-card');
+            let visibleCount = 0;
 
             cards.forEach(card => {
                 const title = card.querySelector('h3').textContent.toLowerCase();
-                if (title.includes(searchTerm)) {
+                const convData = findConversationData(title);
+
+                // Check if matches search
+                let matchesSearch = true;
+                if (searchTerm) {
+                    matchesSearch = title.includes(searchTerm) ||
+                                   (convData && convData.search_text && convData.search_text.includes(searchTerm));
+                }
+
+                if (matchesSearch) {
                     card.style.display = 'block';
+                    visibleCount++;
                 } else {
                     card.style.display = 'none';
                 }
             });
+
+            updateVisibleCount(visibleCount);
+        }
+
+        function findConversationData(title) {
+            return conversationsData.find(c => c.title.toLowerCase() === title.toLowerCase());
+        }
+
+        function applyFilters() {
+            const minMessages = parseInt(document.getElementById('filter-messages-min').value) || 0;
+            const maxMessages = parseInt(document.getElementById('filter-messages-max').value) || Infinity;
+            const minWords = parseInt(document.getElementById('filter-words-min').value) || 0;
+            const maxWords = parseInt(document.getElementById('filter-words-max').value) || Infinity;
+            const startDate = document.getElementById('filter-date-start').value;
+            const endDate = document.getElementById('filter-date-end').value;
+            const excludeCode = document.getElementById('filter-exclude-code').checked;
+            const hasMediaOnly = document.getElementById('filter-has-media').checked;
+            const searchTerm = document.getElementById('search').value.toLowerCase();
+
+            const cards = document.querySelectorAll('.conversation-card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const messages = parseInt(card.dataset.messages) || 0;
+                const words = parseInt(card.dataset.words) || 0;
+                const code = parseFloat(card.dataset.code) || 0;
+                const timestamp = parseInt(card.dataset.timestamp) || 0;
+                const hasMedia = card.dataset.hasMedia === 'true';
+                const title = card.querySelector('h3').textContent.toLowerCase();
+                const convData = findConversationData(title);
+
+                let visible = true;
+
+                // Search filter
+                if (searchTerm) {
+                    const matchesSearch = title.includes(searchTerm) ||
+                                        (convData && convData.search_text && convData.search_text.includes(searchTerm));
+                    if (!matchesSearch) visible = false;
+                }
+
+                // Message count filter
+                if (messages < minMessages || messages > maxMessages) visible = false;
+
+                // Word count filter
+                if (words < minWords || words > maxWords) visible = false;
+
+                // Date range filter
+                if (startDate) {
+                    const start = new Date(startDate).getTime() / 1000;
+                    if (timestamp < start) visible = false;
+                }
+                if (endDate) {
+                    const end = new Date(endDate).getTime() / 1000;
+                    if (timestamp > end) visible = false;
+                }
+
+                // Code exclusion filter
+                if (excludeCode && code > 50) visible = false;
+
+                // Media filter
+                if (hasMediaOnly && !hasMedia) visible = false;
+
+                card.style.display = visible ? 'block' : 'none';
+                if (visible) visibleCount++;
+            });
+
+            updateVisibleCount(visibleCount);
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-messages-min').value = '';
+            document.getElementById('filter-messages-max').value = '';
+            document.getElementById('filter-words-min').value = '';
+            document.getElementById('filter-words-max').value = '';
+            document.getElementById('filter-date-start').value = '';
+            document.getElementById('filter-date-end').value = '';
+            document.getElementById('filter-exclude-code').checked = false;
+            document.getElementById('filter-has-media').checked = false;
+
+            filterConversations();  // Apply just the search term if any
+        }
+
+        function updateVisibleCount(count) {
+            const total = document.querySelectorAll('.conversation-card').length;
+            document.getElementById('stat-showing').textContent = `Showing: ${count}`;
+        }
+
+        function clearSearch() {
+            document.getElementById('search').value = '';
+            localStorage.removeItem('lastSearch');
+            filterConversations();
+        }
+
+        function saveCurrentSearch() {
+            const searchTerm = document.getElementById('search').value;
+            if (searchTerm.trim()) {
+                localStorage.setItem('lastSearch', searchTerm);
+            }
+        }
+
+        function restoreLastSearch() {
+            const lastSearch = localStorage.getItem('lastSearch');
+            if (lastSearch) {
+                document.getElementById('search').value = lastSearch;
+                filterConversations();
+            }
+        }
+
+        function loadSearchHistory() {
+            const history = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+            const historyContainer = document.getElementById('search-history');
+
+            historyContainer.innerHTML = '';
+            history.slice(0, MAX_SEARCH_HISTORY).forEach(term => {
+                const item = document.createElement('span');
+                item.className = 'search-history-item';
+                item.textContent = term;
+                item.onclick = () => {
+                    document.getElementById('search').value = term;
+                    filterConversations();
+                };
+                historyContainer.appendChild(item);
+            });
+        }
+
+        function addToSearchHistory(term) {
+            let history = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+
+            // Remove if already exists
+            history = history.filter(t => t !== term);
+
+            // Add to beginning
+            history.unshift(term);
+
+            // Limit size
+            history = history.slice(0, MAX_SEARCH_HISTORY);
+
+            localStorage.setItem('searchHistory', JSON.stringify(history));
+            loadSearchHistory();
         }
         '''
