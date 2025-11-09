@@ -1341,7 +1341,6 @@ class HTMLGenerator:
             message_count = 0
             total_words = 0
             code_block_count = 0
-            all_text = []  # For full-text search
 
             for node in mapping.values():
                 msg = node.get('message')
@@ -1356,7 +1355,6 @@ class HTMLGenerator:
                     parts = content.get('parts', [])
                     for part in parts:
                         if isinstance(part, str):
-                            all_text.append(part.lower())
                             words = part.split()
                             total_words += len(words)
                             # Count code blocks
@@ -1367,12 +1365,10 @@ class HTMLGenerator:
                     parts = content.get('parts', [])
                     for part in parts:
                         if isinstance(part, str):
-                            all_text.append(part.lower())
                             total_words += len(part.split())
                         elif isinstance(part, dict) and part.get('content_type') == 'audio_transcription':
                             text = part.get('text', '')
                             if text:
-                                all_text.append(text.lower())
                                 total_words += len(text.split())
 
             # Calculate code percentage
@@ -1395,8 +1391,7 @@ class HTMLGenerator:
                     'code_percentage': code_percentage,
                     'has_media': has_media,
                     'has_assets': has_assets,
-                    'conv_id': conv_id,
-                    'search_text': ' '.join(all_text)  # Combined text for searching
+                    'conv_id': conv_id
                 })
 
         # Sort by create_time (newest first)
@@ -1959,10 +1954,9 @@ class HTMLGenerator:
 
                 let visible = true;
 
-                // Search filter
+                // Search filter (title only)
                 if (searchTerm) {
-                    const matchesSearch = title.includes(searchTerm) ||
-                                        (convData && convData.search_text && convData.search_text.includes(searchTerm));
+                    const matchesSearch = title.includes(searchTerm);
                     if (!matchesSearch) visible = false;
                 }
 
