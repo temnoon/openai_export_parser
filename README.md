@@ -4,9 +4,9 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/openai-export-parser.svg)](https://pypi.org/project/openai-export-parser/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**A comprehensive parser for OpenAI ChatGPT export archives with advanced media matching, audio transcripts, and beautiful HTML output.**
+**A comprehensive parser for OpenAI ChatGPT and Claude conversation exports with advanced media matching, audio transcripts, and beautiful HTML output.**
 
-Parse OpenAI's complex, nested export.zip files into organized, browsable conversations with automatic media matching, voice transcripts, and a complete HTML viewer.
+Parse both OpenAI's complex nested export.zip files and Claude's conversation exports into organized, browsable conversations with automatic media matching, voice transcripts, and a complete HTML viewer.
 
 ## ✨ Key Features
 
@@ -30,9 +30,11 @@ Parse OpenAI's complex, nested export.zip files into organized, browsable conver
 - **Responsive Design** - Works perfectly on desktop and mobile
 
 ### 🔧 **Robust Processing**
+- **Multi-Platform Support** - Parses both OpenAI ChatGPT and Claude conversation exports
+- **Auto-Detection** - Automatically detects export type (OpenAI or Claude)
 - **Recursive Zip Extraction** - Handles arbitrarily nested zip archives
 - **Malformed Zip Recovery** - Works with corrupted exports using fallback extraction
-- **Schema Inference** - Future-proof against OpenAI format changes
+- **Schema Inference** - Future-proof against format changes
 - **Progress Tracking** - Real-time progress bars for long operations
 - **Error Recovery** - Gracefully handles incomplete or partial exports
 
@@ -61,8 +63,11 @@ pip install -e .
 ### Command Line
 
 ```bash
-# Basic usage - creates browsable HTML output
+# OpenAI ChatGPT export - automatically detected
 openai-export-parser export.zip
+
+# Claude conversation export - automatically detected
+openai-export-parser claude_data_export.zip
 
 # Specify output directory
 openai-export-parser export.zip -o my_conversations
@@ -209,23 +214,45 @@ for conv_file in Path("parsed").glob("*/conversation.json"):
         # your_embedding_function(text, metadata)
 ```
 
-## Understanding OpenAI Export Formats
+## Understanding Export Formats
+
+### OpenAI ChatGPT Exports
 
 OpenAI has changed export formats over time:
 
-### New Format (2024+)
+**New Format (2024+)**
 - Multiple nested zips
 - Files in `file-service://` format
 - DALL-E metadata in separate fields
 - Voice transcripts in `audio_transcription` parts
 
-### Old Format (Pre-2024)
+**Old Format (Pre-2024)**
 - Single `conversations.json` file
 - Flat media directory
 - Simple file naming
 - Limited metadata
 
-**This parser handles both formats automatically** and can merge data from multiple exports.
+**This parser handles both OpenAI formats automatically** and can merge data from multiple exports.
+
+### Claude Conversation Exports
+
+Claude exports have a simpler structure:
+
+**Export Format**
+- Single zip file with 3 JSON files:
+  - `conversations.json` - All conversation data
+  - `projects.json` - Project knowledge bases
+  - `users.json` - User profile information
+- Flat message structure (no complex nesting)
+- File attachments referenced by filename
+- ISO 8601 timestamps
+
+**How to Export from Claude:**
+1. Go to Settings > Privacy (web app or Claude Desktop)
+2. Request data export
+3. Download the zip file from the email link (expires in 24 hours)
+
+**This parser automatically detects and converts Claude exports** to the same organized format as OpenAI exports.
 
 ## Troubleshooting
 
