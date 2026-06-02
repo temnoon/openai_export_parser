@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Assets stored as `file-<ID>.dat` are now matched and rendered instead of
   being silently skipped
+- CI: the Tests workflow now triggers on the `master` branch (it previously
+  targeted only `main`/`develop` and never ran), fixing the broken status badge
+- Modernized the README Tests badge URL to the `actions/workflows/...` form
+
+### Tests
+- Added unit tests for `sniff_extension`, the indexer's `file-<ID>.dat` file-ID
+  extraction, and media-reference extraction from the mapping tree
+- `black` formatting is now an advisory (non-blocking) CI step pending a
+  full one-time reformat of the legacy codebase
 
 ## [0.2.0] - 2025-01-06
 

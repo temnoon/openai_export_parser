@@ -1,6 +1,6 @@
 # openai-export-parser
 
-[![Tests](https://github.com/temnoon/openai_export_parser/workflows/Tests/badge.svg)](https://github.com/temnoon/openai_export_parser/actions)
+[![Tests](https://github.com/temnoon/openai_export_parser/actions/workflows/tests.yml/badge.svg)](https://github.com/temnoon/openai_export_parser/actions/workflows/tests.yml)
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
