@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Support for the May/June 2026 OpenAI ChatGPT export format
+- Magic-byte file-type sniffing (`utils.sniff_extension`) to recover real
+  extensions for assets stored with a generic `.dat` extension, so images and
+  audio render in the HTML viewer
+
+### Changed
+- `utils.unzip` now routes archives larger than 4 GiB straight to `ditto` on
+  macOS. Recent multi-GB exports are written as non-ZIP64 archives whose
+  central-directory offsets wrap at 4 GiB and whose members use data
+  descriptors; `unzip`, `bsdtar`, and Python's `zipfile` all fail past that
+  boundary, while `ditto` (Finder's Archive Utility engine) streams them
+  correctly
+- Media indexer/scanner now recognize `.dat` assets, and the file-ID matcher
+  handles the `file-<ID>.dat` naming (no separator) used by recent exports
+- Copied media is renamed from `.dat` to its detected real extension
+
+### Fixed
+- Assets stored as `file-<ID>.dat` are now matched and rendered instead of
+  being silently skipped
+
 ## [0.2.0] - 2025-01-06
 
 ### Added

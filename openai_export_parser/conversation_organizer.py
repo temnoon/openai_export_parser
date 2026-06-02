@@ -20,6 +20,7 @@ from .utils import (
     sanitize_filename,
     timestamp_to_iso,
     copy_file,
+    sniff_extension,
 )
 from .html_generator import HTMLGenerator
 
@@ -130,6 +131,30 @@ class ConversationOrganizer:
 
         return assets
 
+    def _hashed_media_name(self, src_path):
+        """
+        Build the destination filename for a copied media file:
+        "{hash}_{basename}", recovering a real extension when the source
+        was stored with a generic ".dat" extension (2025+ OpenAI exports).
+
+        The file-ID / hash embedded in the basename is preserved, so the
+        HTML viewer's asset-pointer resolution still matches.
+
+        Returns:
+            (hashed_name, original_basename)
+        """
+        original_basename = os.path.basename(src_path)
+        file_hash = hash_file(src_path)
+
+        stem, ext = os.path.splitext(original_basename)
+        if ext.lower() in (".dat", ""):
+            real_ext = sniff_extension(src_path, default=ext or ".dat")
+            basename = stem + real_ext
+        else:
+            basename = original_basename
+
+        return f"{file_hash}_{basename}", original_basename
+
     def write_organized_output(
         self, conversations, all_media_files, out_dir, media_manifest
     ):
@@ -199,18 +224,15 @@ class ConversationOrganizer:
 
                     basename = os.path.basename(src_path)
 
-                    # Generate hash for unique naming
+                    # Generate hash for unique naming (recovers real extension
+                    # for ".dat" assets so the HTML viewer can render them)
                     try:
-                        file_hash = hash_file(src_path)
-                        # Keep original extension
-                        _, ext = os.path.splitext(basename)
-                        # Use hash + original name for uniqueness and recognition
-                        hashed_name = f"{file_hash}_{basename}"
+                        hashed_name, original_basename = self._hashed_media_name(src_path)
 
                         dst_path = os.path.join(media_dir, hashed_name)
                         copy_file(src_path, dst_path)
 
-                        media_mapping[basename] = hashed_name
+                        media_mapping[original_basename] = hashed_name
 
                     except Exception as e:
                         self.log(f"Error processing media {basename}: {e}")
@@ -225,18 +247,15 @@ class ConversationOrganizer:
 
                     src_path = media_lookup[basename]
 
-                    # Generate hash for unique naming
+                    # Generate hash for unique naming (recovers real extension
+                    # for ".dat" assets so the HTML viewer can render them)
                     try:
-                        file_hash = hash_file(src_path)
-                        # Keep original extension
-                        _, ext = os.path.splitext(basename)
-                        # Use hash + original name for uniqueness and recognition
-                        hashed_name = f"{file_hash}_{basename}"
+                        hashed_name, original_basename = self._hashed_media_name(src_path)
 
                         dst_path = os.path.join(media_dir, hashed_name)
                         copy_file(src_path, dst_path)
 
-                        media_mapping[basename] = hashed_name
+                        media_mapping[original_basename] = hashed_name
 
                     except Exception as e:
                         self.log(f"Error processing media {basename}: {e}")

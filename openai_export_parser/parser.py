@@ -12,7 +12,9 @@ from .threader import ConversationThreader
 from .conversation_organizer import ConversationOrganizer
 
 MEDIA_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif",
-             ".mp3", ".wav", ".mp4", ".mov", ".pdf"}
+             ".mp3", ".wav", ".mp4", ".mov", ".pdf",
+             # 2025+ exports store assets with their extension stripped to .dat
+             ".dat"}
 
 
 class ExportParser:

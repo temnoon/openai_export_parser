@@ -9,13 +9,43 @@ def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
 
 
+# 4 GiB. OpenAI's 2025+ multi-GB exports are written as non-ZIP64 archives
+# whose central-directory offsets wrap at this boundary and whose members use
+# data descriptors. Python's zipfile (and Info-ZIP unzip / bsdtar) cannot read
+# members past this point — only streaming extractors (macOS ditto / Archive
+# Utility) succeed. For such archives we skip straight to ditto on macOS.
+_ZIP64_WRAP_THRESHOLD = 4 * 1024 ** 3
+
+
 def unzip(src, dst):
     """
     Extract zip archive to destination directory.
     Falls back to system unzip command if Python zipfile fails.
     Handles corrupted/malformed zips that macOS can still open.
     """
+    import sys
+
     ensure_dir(dst)
+
+    # Large OpenAI exports (>4 GiB) are broken non-ZIP64 archives that Python's
+    # zipfile only partially extracts before raising. On macOS, go straight to
+    # ditto (the same engine as Finder's Archive Utility), which streams members
+    # via their local headers and handles these archives correctly.
+    try:
+        too_big = os.path.getsize(src) > _ZIP64_WRAP_THRESHOLD
+    except OSError:
+        too_big = False
+
+    if too_big and sys.platform == "darwin":
+        import subprocess
+        try:
+            subprocess.run(
+                ["ditto", "-x", "-k", src, dst],
+                check=True, capture_output=True, text=True
+            )
+            return
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass  # Fall through to the normal Python-first path
 
     # Try Python's zipfile first
     try:
@@ -87,6 +117,70 @@ def unzip(src, dst):
 def is_zip(path):
     """Check if file is a valid zip archive."""
     return zipfile.is_zipfile(path)
+
+
+# Magic-byte signatures -> file extension. Used to recover the real type of
+# 2025+ OpenAI export assets, which are all stored with a generic ".dat"
+# extension regardless of their actual format.
+_MAGIC_SIGNATURES = (
+    (b"\x89PNG\r\n\x1a\n", ".png"),
+    (b"\xff\xd8\xff", ".jpg"),
+    (b"GIF87a", ".gif"),
+    (b"GIF89a", ".gif"),
+    (b"%PDF", ".pdf"),
+    (b"BM", ".bmp"),
+    (b"\x1aE\xdf\xa3", ".webm"),  # also Matroska
+    (b"OggS", ".ogg"),
+    (b"fLaC", ".flac"),
+    (b"ID3", ".mp3"),
+)
+
+
+def sniff_extension(path, default=None):
+    """
+    Detect a file's real extension from its magic bytes.
+
+    OpenAI's 2025+ exports strip extensions, storing every asset as ".dat".
+    This restores a sensible extension so images/audio render in the HTML
+    viewer. Handles container formats (RIFF -> wav/webp/avi, ISO-BMFF -> mp4/mov)
+    that need a few extra bytes to disambiguate.
+
+    Args:
+        path: Path to the file to inspect
+        default: Extension to return if the type can't be identified
+                 (defaults to the file's current extension)
+
+    Returns:
+        An extension string including the leading dot (e.g. ".png").
+    """
+    if default is None:
+        default = os.path.splitext(path)[1] or ".dat"
+
+    try:
+        with open(path, "rb") as f:
+            head = f.read(16)
+    except OSError:
+        return default
+
+    for sig, ext in _MAGIC_SIGNATURES:
+        if head.startswith(sig):
+            return ext
+
+    # RIFF container: bytes 8-12 give the form type (WAVE, WEBP, AVI )
+    if head[:4] == b"RIFF":
+        form = head[8:12]
+        return {b"WAVE": ".wav", b"WEBP": ".webp", b"AVI ": ".avi"}.get(form, default)
+
+    # ISO base media (MP4/MOV/M4A): "ftyp" box at offset 4
+    if head[4:8] == b"ftyp":
+        brand = head[8:12]
+        if brand[:3] == b"qt ":
+            return ".mov"
+        if brand in (b"M4A ", b"M4A\x00"):
+            return ".m4a"
+        return ".mp4"
+
+    return default
 
 
 def copy_file(src, dst):

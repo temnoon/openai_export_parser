@@ -28,7 +28,10 @@ class ComprehensiveMediaIndexer:
         '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff',
         '.pdf', '.svg',
         '.mp3', '.wav', '.m4a', '.ogg', '.flac',
-        '.mp4', '.mov', '.avi', '.mkv', '.webm'
+        '.mp4', '.mov', '.avi', '.mkv', '.webm',
+        # 2025+ exports strip the real extension and store assets as
+        # "file-<ID>.dat" (inside Conversations__*.zip shards).
+        '.dat'
     }
 
     def __init__(self, verbose=False):
@@ -163,6 +166,8 @@ class ComprehensiveMediaIndexer:
         Patterns:
         - file-{ID}_{filename}
         - file-{ID}-{filename}
+        - file-{ID}.{ext}      (2025+ exports, e.g. "file-ABC123.dat")
+        - file-{ID}            (bare, no extension)
 
         Returns:
             file-ID or None
@@ -174,6 +179,12 @@ class ComprehensiveMediaIndexer:
 
         # Try hyphen separator
         match = re.match(r'(file-[A-Za-z0-9]+)-', filename)
+        if match:
+            return match.group(1)
+
+        # 2025+ exports: "file-{ID}.dat" / "file-{ID}.jpeg" — no name part,
+        # the whole stem IS the file-ID. Also handles a bare "file-{ID}".
+        match = re.match(r'(file-[A-Za-z0-9]+)(?:\.[A-Za-z0-9]+)?$', filename)
         if match:
             return match.group(1)
 
