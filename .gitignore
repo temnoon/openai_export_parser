@@ -73,6 +73,7 @@ create_unmatched_report_from_source.py
 *.swo
 *~
 
-# Test files
-test_*.py
-*_test.py
+# Ad-hoc experiment scripts in the repo root (anchored so the real
+# tests/ suite is still tracked)
+/test_*.py
+/*_test.py
