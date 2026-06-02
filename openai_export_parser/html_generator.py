@@ -20,7 +20,14 @@ class HTMLGenerator:
     def __init__(self):
         pass
 
-    def generate_conversation_html(self, conversation, media_files=None, assets=None, folder_name="", media_mapping=None):
+    def generate_conversation_html(
+        self,
+        conversation,
+        media_files=None,
+        assets=None,
+        folder_name="",
+        media_mapping=None,
+    ):
         """
         Generate a standalone HTML file for a conversation.
 
@@ -39,27 +46,31 @@ class HTMLGenerator:
         media_mapping = media_mapping or {}
 
         # Extract conversation metadata
-        title = conversation.get('title', 'Untitled Conversation')
-        create_time = conversation.get('create_time')
-        update_time = conversation.get('update_time')
-        conv_id = conversation.get('conversation_id') or conversation.get('id', 'unknown')
+        title = conversation.get("title", "Untitled Conversation")
+        create_time = conversation.get("create_time")
+        update_time = conversation.get("update_time")
+        conv_id = conversation.get("conversation_id") or conversation.get(
+            "id", "unknown"
+        )
 
         # Format timestamps
-        created_date = self._format_timestamp(create_time) if create_time else 'Unknown'
-        updated_date = self._format_timestamp(update_time) if update_time else 'Unknown'
+        created_date = self._format_timestamp(create_time) if create_time else "Unknown"
+        updated_date = self._format_timestamp(update_time) if update_time else "Unknown"
 
         # Count messages
-        mapping = conversation.get('mapping', {})
-        message_count = sum(1 for node in mapping.values() if node.get('message'))
+        mapping = conversation.get("mapping", {})
+        message_count = sum(1 for node in mapping.values() if node.get("message"))
 
         # Build asset_pointer -> filename mapping for size-matched images
         # This maps (asset_pointer, size) pairs to actual filenames
-        asset_pointer_map = self._build_asset_pointer_map(conversation, media_files, media_mapping)
+        asset_pointer_map = self._build_asset_pointer_map(
+            conversation, media_files, media_mapping
+        )
 
         # Serialize conversation data for embedding
         conv_json = json.dumps(conversation, indent=2, ensure_ascii=False)
 
-        html_template = f'''<!DOCTYPE html>
+        html_template = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -141,13 +152,13 @@ class HTMLGenerator:
 {self._get_javascript()}
     </script>
 </body>
-</html>'''
+</html>"""
 
         return html_template
 
     def _get_css(self):
         """Get CSS styles for the conversation viewer."""
-        return '''
+        return """
         * {
             margin: 0;
             padding: 0;
@@ -650,11 +661,11 @@ class HTMLGenerator:
         .message-content tr:hover {
             background-color: var(--table-header-bg);
         }
-        '''
+        """
 
     def _get_javascript(self):
         """Get JavaScript for rendering the conversation."""
-        return '''
+        return """
         // Configure marked.js for Markdown rendering
         marked.setOptions({
             breaks: true,
@@ -1201,7 +1212,7 @@ class HTMLGenerator:
                 initializeLightbox();
             }, 100);
         });
-        '''
+        """
 
     def _build_asset_pointer_map(self, conversation, media_files, media_mapping):
         """
@@ -1223,6 +1234,7 @@ class HTMLGenerator:
         """
         import os
         import re
+
         asset_map = {}
 
         # Step 1: Get actual file sizes from media_mapping
@@ -1230,7 +1242,7 @@ class HTMLGenerator:
         size_to_files = {}  # file_size -> [hashed_filename, ...]
 
         # Get full paths from conversation (these have actual file sizes)
-        full_paths = conversation.get('_media_files', [])
+        full_paths = conversation.get("_media_files", [])
 
         for full_path in full_paths:
             basename = os.path.basename(full_path)
@@ -1248,12 +1260,12 @@ class HTMLGenerator:
 
         # Step 2: Collect asset_pointers with their sizes from conversation
         # Process in traversal order to maintain sequence
-        mapping = conversation.get('mapping', {})
+        mapping = conversation.get("mapping", {})
 
         # Find root and traverse in order
         root_id = None
         for node_id, node_data in mapping.items():
-            if node_data.get('parent') is None:
+            if node_data.get("parent") is None:
                 root_id = node_id
                 break
 
@@ -1261,22 +1273,26 @@ class HTMLGenerator:
 
         def traverse(node_id):
             node_data = mapping.get(node_id, {})
-            msg = node_data.get('message')
+            msg = node_data.get("message")
 
             if msg:
-                content = msg.get('content', {})
-                if content.get('content_type') == 'multimodal_text':
-                    parts = content.get('parts', [])
+                content = msg.get("content", {})
+                if content.get("content_type") == "multimodal_text":
+                    parts = content.get("parts", [])
                     for part in parts:
                         if isinstance(part, dict):
-                            asset_pointer = part.get('asset_pointer', '')
-                            if asset_pointer and asset_pointer.startswith('file-service://'):
-                                size_bytes = part.get('size_bytes')
+                            asset_pointer = part.get("asset_pointer", "")
+                            if asset_pointer and asset_pointer.startswith(
+                                "file-service://"
+                            ):
+                                size_bytes = part.get("size_bytes")
                                 if size_bytes:
-                                    asset_pointers_ordered.append((asset_pointer, size_bytes))
+                                    asset_pointers_ordered.append(
+                                        (asset_pointer, size_bytes)
+                                    )
 
             # Traverse children
-            for child_id in node_data.get('children', []):
+            for child_id in node_data.get("children", []):
                 traverse(child_id)
 
         if root_id:
@@ -1311,12 +1327,14 @@ class HTMLGenerator:
         """Escape HTML special characters."""
         if not text:
             return ""
-        return (str(text)
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("'", "&#39;"))
+        return (
+            str(text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#39;")
+        )
 
     def generate_index_html(self, conversations, output_dir):
         """
@@ -1332,84 +1350,100 @@ class HTMLGenerator:
         # Build conversation list with extended metadata
         conv_list = []
         for conv in conversations:
-            title = conv.get('title', 'Untitled')
-            create_time = conv.get('create_time')
-            conv_id = conv.get('conversation_id') or conv.get('id', 'unknown')
+            title = conv.get("title", "Untitled")
+            create_time = conv.get("create_time")
+            conv_id = conv.get("conversation_id") or conv.get("id", "unknown")
 
             # Count messages and calculate metrics
-            mapping = conv.get('mapping', {})
+            mapping = conv.get("mapping", {})
             message_count = 0
             total_words = 0
             code_block_count = 0
 
             for node in mapping.values():
-                msg = node.get('message')
+                msg = node.get("message")
                 if not msg:
                     continue
 
                 message_count += 1
-                content = msg.get('content', {})
+                content = msg.get("content", {})
 
                 # Extract text content
-                if content.get('content_type') == 'text':
-                    parts = content.get('parts', [])
+                if content.get("content_type") == "text":
+                    parts = content.get("parts", [])
                     for part in parts:
                         if isinstance(part, str):
                             words = part.split()
                             total_words += len(words)
                             # Count code blocks
-                            code_block_count += part.count('```') // 2
+                            code_block_count += part.count("```") // 2
 
                 # Also check multimodal_text for audio transcripts etc
-                elif content.get('content_type') == 'multimodal_text':
-                    parts = content.get('parts', [])
+                elif content.get("content_type") == "multimodal_text":
+                    parts = content.get("parts", [])
                     for part in parts:
                         if isinstance(part, str):
                             total_words += len(part.split())
-                        elif isinstance(part, dict) and part.get('content_type') == 'audio_transcription':
-                            text = part.get('text', '')
+                        elif (
+                            isinstance(part, dict)
+                            and part.get("content_type") == "audio_transcription"
+                        ):
+                            text = part.get("text", "")
                             if text:
                                 total_words += len(text.split())
 
             # Calculate code percentage
-            code_percentage = (code_block_count / message_count * 100) if message_count > 0 else 0
+            code_percentage = (
+                (code_block_count / message_count * 100) if message_count > 0 else 0
+            )
 
             # Check for media/assets
-            has_media = bool(conv.get('_media_files'))
-            has_assets = '_assets' in conv
+            has_media = bool(conv.get("_media_files"))
+            has_assets = "_assets" in conv
 
             # Get folder name
-            folder_name = conv.get('_folder_name', '')
+            folder_name = conv.get("_folder_name", "")
 
             if folder_name:
-                conv_list.append({
-                    'title': title,
-                    'folder_name': folder_name,
-                    'create_time': create_time,
-                    'message_count': message_count,
-                    'word_count': total_words,
-                    'code_percentage': code_percentage,
-                    'has_media': has_media,
-                    'has_assets': has_assets,
-                    'conv_id': conv_id
-                })
+                conv_list.append(
+                    {
+                        "title": title,
+                        "folder_name": folder_name,
+                        "create_time": create_time,
+                        "message_count": message_count,
+                        "word_count": total_words,
+                        "code_percentage": code_percentage,
+                        "has_media": has_media,
+                        "has_assets": has_assets,
+                        "conv_id": conv_id,
+                    }
+                )
 
         # Sort by create_time (newest first)
-        conv_list.sort(key=lambda x: x['create_time'] or 0, reverse=True)
+        conv_list.sort(key=lambda x: x["create_time"] or 0, reverse=True)
 
         # Serialize conversation data for JavaScript
         import json as json_lib
+
         conversations_json = json_lib.dumps(conv_list, ensure_ascii=False)
 
         # Generate HTML cards (JavaScript will handle filtering)
-        conversations_html = ''
+        conversations_html = ""
         for conv in conv_list:
-            date_str = self._format_timestamp(conv['create_time']) if conv['create_time'] else 'Unknown'
-            media_badge = '🖼️ Media' if conv['has_media'] else ''
-            assets_badge = '📄 Assets' if conv['has_assets'] else ''
-            code_badge = f'💻 {conv["code_percentage"]:.0f}% code' if conv['code_percentage'] > 20 else ''
+            date_str = (
+                self._format_timestamp(conv["create_time"])
+                if conv["create_time"]
+                else "Unknown"
+            )
+            media_badge = "🖼️ Media" if conv["has_media"] else ""
+            assets_badge = "📄 Assets" if conv["has_assets"] else ""
+            code_badge = (
+                f'💻 {conv["code_percentage"]:.0f}% code'
+                if conv["code_percentage"] > 20
+                else ""
+            )
 
-            conversations_html += f'''
+            conversations_html += f"""
                 <div class="conversation-card"
                      data-messages="{conv['message_count']}"
                      data-words="{conv['word_count']}"
@@ -1429,9 +1463,9 @@ class HTMLGenerator:
                         </div>
                     </a>
                 </div>
-            '''
+            """
 
-        html = f'''<!DOCTYPE html>
+        html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1527,13 +1561,13 @@ class HTMLGenerator:
 {self._get_index_javascript()}
     </script>
 </body>
-</html>'''
+</html>"""
 
         return html
 
     def _get_index_css(self):
         """Get CSS for index page."""
-        return '''
+        return """
         * {
             margin: 0;
             padding: 0;
@@ -1854,11 +1888,11 @@ class HTMLGenerator:
                 grid-template-columns: 1fr;
             }
         }
-        '''
+        """
 
     def _get_index_javascript(self):
         """Get JavaScript for index page with enhanced filtering."""
-        return '''
+        return """
         // Load conversation data
         const conversationsData = JSON.parse(document.getElementById('conversations-data').textContent);
         const MAX_SEARCH_HISTORY = 10;
@@ -2060,4 +2094,4 @@ class HTMLGenerator:
             localStorage.setItem('searchHistory', JSON.stringify(history));
             loadSearchHistory();
         }
-        '''
+        """

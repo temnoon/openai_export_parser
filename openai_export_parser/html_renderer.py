@@ -76,7 +76,7 @@ class HTMLRenderer:
         html_parts.append('<div class="messages">')
         for msg in messages:
             html_parts.append(self._html_message(msg))
-        html_parts.append('</div>')
+        html_parts.append("</div>")
 
         # Footer
         html_parts.append(self._html_footer())
@@ -125,7 +125,9 @@ class HTMLRenderer:
 
         # Find root node (no parent)
         root_nodes = [
-            node_id for node_id, node_data in mapping.items() if not node_data.get("parent")
+            node_id
+            for node_id, node_data in mapping.items()
+            if not node_data.get("parent")
         ]
 
         if not root_nodes:
@@ -158,7 +160,7 @@ class HTMLRenderer:
         """Generate HTML header with CSS."""
         title = escape(self.conversation.get("title", "Conversation"))
 
-        return f'''<!DOCTYPE html>
+        return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -280,7 +282,7 @@ class HTMLRenderer:
     </style>
 </head>
 <body>
-    <div class="container">'''
+    <div class="container">"""
 
     def _html_metadata(self):
         """Generate metadata panel HTML."""
@@ -290,7 +292,7 @@ class HTMLRenderer:
         conv_id = escape(str(self.conversation.get("conversation_id", "N/A")))
         model = escape(str(self.conversation.get("default_model_slug", "N/A")))
 
-        return f'''
+        return f"""
         <div class="metadata">
             <h1>{title}</h1>
             <div class="info">
@@ -311,7 +313,7 @@ class HTMLRenderer:
                     {model}
                 </div>
             </div>
-        </div>'''
+        </div>"""
 
     def _html_message(self, message):
         """Generate HTML for a single message."""
@@ -322,7 +324,7 @@ class HTMLRenderer:
         content = self._extract_message_content(message)
         content_html = self._format_content(content, message)
 
-        return f'''
+        return f"""
         <div class="message {escape(role)}">
             <div class="message-header">
                 <span class="message-role">{escape(role)}</span>
@@ -331,7 +333,7 @@ class HTMLRenderer:
             <div class="message-content">
                 {content_html}
             </div>
-        </div>'''
+        </div>"""
 
     def _extract_message_content(self, message):
         """Extract text content from message."""
@@ -400,10 +402,10 @@ class HTMLRenderer:
 
     def _html_footer(self):
         """Generate HTML footer."""
-        return '''
+        return """
     </div>
 </body>
-</html>'''
+</html>"""
 
 
 def render_conversation_folder(folder_path, output_html=None):

@@ -102,31 +102,33 @@ class ConversationOrganizer:
             List of (filename, content) tuples
         """
         assets = []
-        asset_counter = {'code_block': 0, 'canvas': 0}
+        asset_counter = {"code_block": 0, "canvas": 0}
 
-        mapping = conversation.get('mapping', {})
+        mapping = conversation.get("mapping", {})
 
         for node_id, node_data in mapping.items():
-            message = node_data.get('message')
+            message = node_data.get("message")
             if not message:
                 continue
 
-            content = message.get('content', {})
+            content = message.get("content", {})
 
             # Extract canvas/artifacts
-            if content.get('content_type') == 'canvas':
-                asset_counter['canvas'] += 1
-                text = content.get('text', '')
-                language = content.get('language', 'txt')
+            if content.get("content_type") == "canvas":
+                asset_counter["canvas"] += 1
+                text = content.get("text", "")
+                language = content.get("language", "txt")
                 filename = f"canvas_{node_id[:8]}_{asset_counter['canvas']}.{language}"
                 assets.append((filename, text))
 
             # Extract code blocks from text content
-            elif content.get('content_type') == 'code':
-                asset_counter['code_block'] += 1
-                text = content.get('text', '')
-                language = content.get('language', 'txt')
-                filename = f"code_block_{node_id[:8]}_{asset_counter['code_block']}.{language}"
+            elif content.get("content_type") == "code":
+                asset_counter["code_block"] += 1
+                text = content.get("text", "")
+                language = content.get("language", "txt")
+                filename = (
+                    f"code_block_{node_id[:8]}_{asset_counter['code_block']}.{language}"
+                )
                 assets.append((filename, text))
 
         return assets
@@ -227,7 +229,9 @@ class ConversationOrganizer:
                     # Generate hash for unique naming (recovers real extension
                     # for ".dat" assets so the HTML viewer can render them)
                     try:
-                        hashed_name, original_basename = self._hashed_media_name(src_path)
+                        hashed_name, original_basename = self._hashed_media_name(
+                            src_path
+                        )
 
                         dst_path = os.path.join(media_dir, hashed_name)
                         copy_file(src_path, dst_path)
@@ -250,7 +254,9 @@ class ConversationOrganizer:
                     # Generate hash for unique naming (recovers real extension
                     # for ".dat" assets so the HTML viewer can render them)
                     try:
-                        hashed_name, original_basename = self._hashed_media_name(src_path)
+                        hashed_name, original_basename = self._hashed_media_name(
+                            src_path
+                        )
 
                         dst_path = os.path.join(media_dir, hashed_name)
                         copy_file(src_path, dst_path)
@@ -269,15 +275,15 @@ class ConversationOrganizer:
             # Generate HTML viewer for this conversation (unless output format is json-only)
             if self.output_format in ["html", "both"]:
                 media_filenames = list(media_mapping.values()) if media_mapping else []
-                conv['_folder_name'] = folder_name  # Store for index generation
-                conv['_assets'] = bool(asset_filenames)  # Mark if has assets
+                conv["_folder_name"] = folder_name  # Store for index generation
+                conv["_assets"] = bool(asset_filenames)  # Mark if has assets
 
                 html_content = self.html_generator.generate_conversation_html(
                     conversation=conv,
                     media_files=media_filenames,
                     assets=asset_filenames,
                     folder_name=folder_name,
-                    media_mapping=media_mapping
+                    media_mapping=media_mapping,
                 )
 
                 html_path = os.path.join(conv_dir, "conversation.html")
@@ -285,8 +291,8 @@ class ConversationOrganizer:
                     f.write(html_content)
             else:
                 # Still store metadata even if not generating HTML
-                conv['_folder_name'] = folder_name
-                conv['_assets'] = bool(asset_filenames)
+                conv["_folder_name"] = folder_name
+                conv["_assets"] = bool(asset_filenames)
 
             created_folders.append(conv_dir)
 
@@ -339,7 +345,9 @@ class ConversationOrganizer:
                     os.symlink(target_path, symlink_path)
                     media_count += 1
                 except Exception as e:
-                    self.log(f"Warning: Could not create media symlink for {folder_name}: {e}")
+                    self.log(
+                        f"Warning: Could not create media symlink for {folder_name}: {e}"
+                    )
 
             # Check if assets folder exists and has files
             if os.path.exists(assets_dir) and os.listdir(assets_dir):
@@ -351,7 +359,9 @@ class ConversationOrganizer:
                     os.symlink(target_path, symlink_path)
                     assets_count += 1
                 except Exception as e:
-                    self.log(f"Warning: Could not create assets symlink for {folder_name}: {e}")
+                    self.log(
+                        f"Warning: Could not create assets symlink for {folder_name}: {e}"
+                    )
 
         self.log(f"✅ Created {media_count} symlinks in _with_media/")
         self.log(f"✅ Created {assets_count} symlinks in _with_assets/")

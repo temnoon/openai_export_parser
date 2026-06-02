@@ -23,7 +23,9 @@ class SchemaInference:
             "fields": list(msg.keys()),
             "has_content_list": isinstance(msg.get("content"), list),
             "has_text": isinstance(msg.get("content"), str),
-            "has_files": any(k in msg for k in ["file_id", "asset_pointer", "attachments"]),
+            "has_files": any(
+                k in msg for k in ["file_id", "asset_pointer", "attachments"]
+            ),
             "has_image_blocks": self._has_image_blocks(msg),
         }
 
@@ -33,8 +35,7 @@ class SchemaInference:
         if not isinstance(c, list):
             return False
         return any(
-            isinstance(i, dict) and i.get("type") in ("image", "input_image")
-            for i in c
+            isinstance(i, dict) and i.get("type") in ("image", "input_image") for i in c
         )
 
     def infer_conversation_schema(self, conversation):

@@ -21,12 +21,12 @@ class MediaMatcher:
     def __init__(self, verbose=False):
         self.verbose = verbose
         self.stats = {
-            'conversation_id_matches': 0,
-            'file_id_matches': 0,
-            'file_hash_matches': 0,
-            'size_matches': 0,
-            'text_matches': 0,
-            'no_matches': 0
+            "conversation_id_matches": 0,
+            "file_id_matches": 0,
+            "file_hash_matches": 0,
+            "size_matches": 0,
+            "text_matches": 0,
+            "no_matches": 0,
         }
 
     def log(self, msg):
@@ -34,7 +34,16 @@ class MediaMatcher:
         if self.verbose:
             print(msg)
 
-    def match(self, conversations, media_files, media_index=None, file_id_index=None, file_hash_index=None, size_index=None, filename_size_index=None):
+    def match(
+        self,
+        conversations,
+        media_files,
+        media_index=None,
+        file_id_index=None,
+        file_hash_index=None,
+        size_index=None,
+        filename_size_index=None,
+    ):
         """
         Match media files to conversations using multiple strategies.
 
@@ -87,7 +96,9 @@ class MediaMatcher:
 
         # Strategy 2: File-ID matching (user uploads with prefix)
         if file_id_index:
-            conversations = self._match_by_file_id(conversations, file_id_index, filename_size_index)
+            conversations = self._match_by_file_id(
+                conversations, file_id_index, filename_size_index
+            )
 
         # Strategy 3: File-hash matching (sediment:// / asset_pointer)
         if file_hash_index:
@@ -98,7 +109,13 @@ class MediaMatcher:
             conversations = self._match_by_size(conversations, size_index)
 
         # Strategy 5: Text content fallback
-        if not media_index and not file_id_index and not file_hash_index and not size_index and media_files:
+        if (
+            not media_index
+            and not file_id_index
+            and not file_hash_index
+            and not size_index
+            and media_files
+        ):
             self.log("Using text content matching (fallback strategy)")
             conversations = self._match_by_text_content(conversations, media_files)
 
@@ -126,10 +143,12 @@ class MediaMatcher:
                     first_msg = conv["messages"][0]
                     first_msg.setdefault("media", []).extend(basenames)
 
-                self.stats['conversation_id_matches'] += 1
-                self.log(f"  Matched {len(media_paths)} files to conversation {conv_id[:8]}...")
+                self.stats["conversation_id_matches"] += 1
+                self.log(
+                    f"  Matched {len(media_paths)} files to conversation {conv_id[:8]}..."
+                )
             else:
-                self.stats['no_matches'] += 1
+                self.stats["no_matches"] += 1
 
         return conversations
 
@@ -177,16 +196,22 @@ class MediaMatcher:
                             if file_path:
                                 conv_media_files.add(file_path)
                                 filename_size_found.append((filename, size))
-                                self.log(f"    Fallback: Matched {filename} ({size} bytes) by filename+size")
+                                self.log(
+                                    f"    Fallback: Matched {filename} ({size} bytes) by filename+size"
+                                )
 
             # Update conversation with found files
             if file_ids_found or filename_size_found:
                 conv["_media_files"] = list(conv_media_files)
-                self.stats['file_id_matches'] += 1
+                self.stats["file_id_matches"] += 1
                 if file_ids_found:
-                    self.log(f"  Matched {len(file_ids_found)} file-IDs to conversation {conv.get('conversation_id', 'unknown')[:8]}...")
+                    self.log(
+                        f"  Matched {len(file_ids_found)} file-IDs to conversation {conv.get('conversation_id', 'unknown')[:8]}..."
+                    )
                 if filename_size_found:
-                    self.log(f"  Matched {len(filename_size_found)} files by filename+size to conversation {conv.get('conversation_id', 'unknown')[:8]}...")
+                    self.log(
+                        f"  Matched {len(filename_size_found)} files by filename+size to conversation {conv.get('conversation_id', 'unknown')[:8]}..."
+                    )
 
         return conversations
 
@@ -230,8 +255,10 @@ class MediaMatcher:
             # Update conversation with found files
             if file_hashes_found:
                 conv["_media_files"] = list(conv_media_files)
-                self.stats['file_hash_matches'] += 1
-                self.log(f"  Matched {len(file_hashes_found)} sediment files to conversation {conv.get('conversation_id', 'unknown')[:8]}...")
+                self.stats["file_hash_matches"] += 1
+                self.log(
+                    f"  Matched {len(file_hashes_found)} sediment files to conversation {conv.get('conversation_id', 'unknown')[:8]}..."
+                )
 
         return conversations
 
@@ -284,14 +311,18 @@ class MediaMatcher:
 
                                 # If unique size, map it directly
                                 if len(matching_files) == 1:
-                                    size_gen_id_map[(file_size, gen_id)] = matching_files[0]
+                                    size_gen_id_map[(file_size, gen_id)] = (
+                                        matching_files[0]
+                                    )
                                 # If collision, we'll need to try both files
                                 # (we can't know which gen_id goes with which file without opening them)
                                 # For now, map both combinations
                                 elif len(matching_files) > 1:
                                     # This is a collision case - map first file
                                     # In practice, caller should match by conversation context
-                                    size_gen_id_map[(file_size, gen_id)] = matching_files[0]
+                                    size_gen_id_map[(file_size, gen_id)] = (
+                                        matching_files[0]
+                                    )
 
         # Second pass: Match files to conversations
         for conv in conversations:
@@ -344,8 +375,10 @@ class MediaMatcher:
             # Update conversation with found files
             if sizes_found:
                 conv["_media_files"] = list(conv_media_files)
-                self.stats['size_matches'] += 1
-                self.log(f"  Matched {len(sizes_found)} DALL-E generation files to conversation {conv.get('conversation_id', 'unknown')[:8]}...")
+                self.stats["size_matches"] += 1
+                self.log(
+                    f"  Matched {len(sizes_found)} DALL-E generation files to conversation {conv.get('conversation_id', 'unknown')[:8]}..."
+                )
 
         return conversations
 
@@ -382,7 +415,7 @@ class MediaMatcher:
 
                     if matched:
                         msg.setdefault("media", []).append(fname)
-                        self.stats['text_matches'] += 1
+                        self.stats["text_matches"] += 1
 
         return conversations
 

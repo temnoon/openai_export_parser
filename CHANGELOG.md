@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Tests
 - Added unit tests for `sniff_extension`, the indexer's `file-<ID>.dat` file-ID
   extraction, and media-reference extraction from the mapping tree
-- `black` formatting is now an advisory (non-blocking) CI step pending a
-  full one-time reformat of the legacy codebase
+- Formatted the entire codebase with `black`; the CI `black --check` step is
+  now a blocking gate
 
 ## [0.2.0] - 2025-01-06
 

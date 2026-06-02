@@ -11,10 +11,20 @@ from .schema_inference import SchemaInference
 from .threader import ConversationThreader
 from .conversation_organizer import ConversationOrganizer
 
-MEDIA_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif",
-             ".mp3", ".wav", ".mp4", ".mov", ".pdf",
-             # 2025+ exports store assets with their extension stripped to .dat
-             ".dat"}
+MEDIA_EXT = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".gif",
+    ".mp3",
+    ".wav",
+    ".mp4",
+    ".mov",
+    ".pdf",
+    # 2025+ exports store assets with their extension stripped to .dat
+    ".dat",
+}
 
 
 class ExportParser:
@@ -29,7 +39,9 @@ class ExportParser:
     - Output generation with normalized structure
     """
 
-    def __init__(self, verbose=False, organize_by_conversation=True, output_format="both"):
+    def __init__(
+        self, verbose=False, organize_by_conversation=True, output_format="both"
+    ):
         self.verbose = verbose
         self.organize_by_conversation = organize_by_conversation
         self.output_format = output_format
@@ -39,7 +51,9 @@ class ExportParser:
         self.matcher = ComprehensiveMediaMatcher(verbose=verbose)
         self.infer = SchemaInference()
         self.threader = ConversationThreader()
-        self.organizer = ConversationOrganizer(verbose=verbose, output_format=output_format)
+        self.organizer = ConversationOrganizer(
+            verbose=verbose, output_format=output_format
+        )
 
         self.conversation_files = []
         self.media_files = []
@@ -89,7 +103,9 @@ class ExportParser:
         # Optional recovery folder for media salvaged from older exports.
         # Defaults to a "recovered_files/" directory at the project root; if it
         # doesn't exist the indexer simply skips it.
-        recovery_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "recovered_files")
+        recovery_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "recovered_files"
+        )
 
         file_indices = self.indexer.build_index(tmp_dir, recovery_dir=recovery_dir)
 
@@ -97,16 +113,18 @@ class ExportParser:
         index_stats = self.indexer.get_stats()
         self.log(f"✓ Indexed {index_stats['total_files']} total media files")
         self.log(f"  - Files with file-ID prefixes: {index_stats['file_id_files']}")
-        self.log(f"  - Files with file_{{hash}}-{{uuid}} pattern: {index_stats['file_hash_files']}")
-        self.log(f"  - Files in conversation directories: {index_stats['conversation_dirs']}")
-        self.log(f"  - Unique (filename, size) pairs: {index_stats['unique_basename_size_pairs']}")
+        self.log(
+            f"  - Files with file_{{hash}}-{{uuid}} pattern: {index_stats['file_hash_files']}"
+        )
+        self.log(
+            f"  - Files in conversation directories: {index_stats['conversation_dirs']}"
+        )
+        self.log(
+            f"  - Unique (filename, size) pairs: {index_stats['unique_basename_size_pairs']}"
+        )
 
         self.log("Matching media to conversations...")
-        conversations = self.matcher.match(
-            conversations,
-            file_indices,
-            self.extractor
-        )
+        conversations = self.matcher.match(conversations, file_indices, self.extractor)
 
         # Log matching stats
         self.matcher.print_summary()
@@ -274,7 +292,9 @@ class ExportParser:
 
         self.log(f"✅ Wrote {len(conversations)} conversations in organized folders")
         if self.output_format in ["html", "both"]:
-            self.log(f"✅ Generated HTML viewer with {len(conversations)} conversation pages")
+            self.log(
+                f"✅ Generated HTML viewer with {len(conversations)} conversation pages"
+            )
         self.log(f"✅ Processed {len(self.media_files)} media file references")
 
     def _write_viewer_launcher(self, out_dir):

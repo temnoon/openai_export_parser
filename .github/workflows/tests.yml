@@ -48,11 +48,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install black flake8
 
-    - name: Check formatting with black (advisory)
+    - name: Check formatting with black
       run: |
-        # Report formatting diffs but don't fail the build: the existing
-        # codebase predates black and a full reformat is tracked separately.
-        black --check --diff openai_export_parser/ tests/ || true
+        black --check openai_export_parser/ tests/
 
     - name: Lint with flake8
       run: |

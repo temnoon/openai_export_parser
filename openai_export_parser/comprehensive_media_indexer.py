@@ -25,13 +25,28 @@ class ComprehensiveMediaIndexer:
     """
 
     MEDIA_EXTENSIONS = {
-        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tiff',
-        '.pdf', '.svg',
-        '.mp3', '.wav', '.m4a', '.ogg', '.flac',
-        '.mp4', '.mov', '.avi', '.mkv', '.webm',
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".tiff",
+        ".pdf",
+        ".svg",
+        ".mp3",
+        ".wav",
+        ".m4a",
+        ".ogg",
+        ".flac",
+        ".mp4",
+        ".mov",
+        ".avi",
+        ".mkv",
+        ".webm",
         # 2025+ exports strip the real extension and store assets as
         # "file-<ID>.dat" (inside Conversations__*.zip shards).
-        '.dat'
+        ".dat",
     }
 
     def __init__(self, verbose=False):
@@ -107,11 +122,11 @@ class ComprehensiveMediaIndexer:
 
                     # Store metadata
                     self.path_to_metadata[filepath] = {
-                        'size': file_size,
-                        'basename': basename,
-                        'ext': ext,
-                        'dirname': dirname,
-                        'filename_only': filename
+                        "size": file_size,
+                        "basename": basename,
+                        "ext": ext,
+                        "dirname": dirname,
+                        "filename_only": filename,
                     }
 
                     # Index 1: By (basename, size) - UNIVERSAL FALLBACK
@@ -150,13 +165,13 @@ class ComprehensiveMediaIndexer:
         self.log(f"  - {len(self.size_to_paths)} unique file sizes")
 
         return {
-            'all_files': self.all_files,
-            'basename_size_to_path': self.basename_size_to_path,
-            'file_id_to_path': self.file_id_to_path,
-            'file_hash_to_path': self.file_hash_to_path,
-            'conversation_to_paths': self.conversation_to_paths,
-            'size_to_paths': self.size_to_paths,
-            'path_to_metadata': self.path_to_metadata
+            "all_files": self.all_files,
+            "basename_size_to_path": self.basename_size_to_path,
+            "file_id_to_path": self.file_id_to_path,
+            "file_hash_to_path": self.file_hash_to_path,
+            "conversation_to_paths": self.conversation_to_paths,
+            "size_to_paths": self.size_to_paths,
+            "path_to_metadata": self.path_to_metadata,
         }
 
     def _extract_file_id(self, filename: str) -> str:
@@ -173,18 +188,18 @@ class ComprehensiveMediaIndexer:
             file-ID or None
         """
         # Try underscore separator
-        match = re.match(r'(file-[A-Za-z0-9]+)_', filename)
+        match = re.match(r"(file-[A-Za-z0-9]+)_", filename)
         if match:
             return match.group(1)
 
         # Try hyphen separator
-        match = re.match(r'(file-[A-Za-z0-9]+)-', filename)
+        match = re.match(r"(file-[A-Za-z0-9]+)-", filename)
         if match:
             return match.group(1)
 
         # 2025+ exports: "file-{ID}.dat" / "file-{ID}.jpeg" — no name part,
         # the whole stem IS the file-ID. Also handles a bare "file-{ID}".
-        match = re.match(r'(file-[A-Za-z0-9]+)(?:\.[A-Za-z0-9]+)?$', filename)
+        match = re.match(r"(file-[A-Za-z0-9]+)(?:\.[A-Za-z0-9]+)?$", filename)
         if match:
             return match.group(1)
 
@@ -199,7 +214,7 @@ class ComprehensiveMediaIndexer:
         Returns:
             "file_{hash}" or None
         """
-        match = re.match(r'(file_[a-f0-9]{32})-[a-f0-9-]{36}\.', filename)
+        match = re.match(r"(file_[a-f0-9]{32})-[a-f0-9-]{36}\.", filename)
         if match:
             return match.group(1)
         return None
@@ -215,16 +230,16 @@ class ComprehensiveMediaIndexer:
         """
         # Standard UUID: 8-4-4-4-12
         match = re.search(
-            r'/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/',
-            filepath
+            r"/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/",
+            filepath,
         )
         if match:
             return match.group(1)
 
         # Alternative UUID: 8-4-4-4-8
         match = re.search(
-            r'/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{8})/',
-            filepath
+            r"/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{8})/",
+            filepath,
         )
         if match:
             return match.group(1)
@@ -234,10 +249,10 @@ class ComprehensiveMediaIndexer:
     def get_stats(self) -> Dict:
         """Get indexing statistics."""
         return {
-            'total_files': len(self.all_files),
-            'file_id_files': len(self.file_id_to_path),
-            'file_hash_files': len(self.file_hash_to_path),
-            'conversation_dirs': len(self.conversation_to_paths),
-            'unique_sizes': len(self.size_to_paths),
-            'unique_basename_size_pairs': len(self.basename_size_to_path)
+            "total_files": len(self.all_files),
+            "file_id_files": len(self.file_id_to_path),
+            "file_hash_files": len(self.file_hash_to_path),
+            "conversation_dirs": len(self.conversation_to_paths),
+            "unique_sizes": len(self.size_to_paths),
+            "unique_basename_size_pairs": len(self.basename_size_to_path),
         }

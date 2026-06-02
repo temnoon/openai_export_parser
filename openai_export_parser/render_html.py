@@ -15,21 +15,17 @@ def main():
     """Command-line interface for HTML rendering."""
     parser = argparse.ArgumentParser(
         description="Render OpenAI conversation folder as HTML",
-        epilog="Example: openai-render-html ./2025-01-06_My_Conversation_00001"
+        epilog="Example: openai-render-html ./2025-01-06_My_Conversation_00001",
     )
 
     parser.add_argument(
-        "folder",
-        help="Path to conversation folder (containing conversation.json)"
+        "folder", help="Path to conversation folder (containing conversation.json)"
     )
     parser.add_argument(
-        "--output", "-o",
-        help="Output HTML file path (default: <folder>/index.html)"
+        "--output", "-o", help="Output HTML file path (default: <folder>/index.html)"
     )
     parser.add_argument(
-        "--version",
-        action="version",
-        version=f"openai-export-parser {__version__}"
+        "--version", action="version", version=f"openai-export-parser {__version__}"
     )
 
     args = parser.parse_args()

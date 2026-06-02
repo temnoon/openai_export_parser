@@ -56,6 +56,7 @@ def test_sniff_extension_missing_file_returns_default():
 
 # --- sanitize_filename --------------------------------------------------------
 
+
 def test_sanitize_filename_replaces_unsafe_characters():
     assert "/" not in sanitize_filename("a/b:c?d")
     assert sanitize_filename("hello world") == "hello_world"
@@ -71,6 +72,7 @@ def test_sanitize_filename_truncates():
 
 
 # --- timestamp_to_iso ---------------------------------------------------------
+
 
 def test_timestamp_to_iso_formats_date():
     # timestamp_to_iso uses local time, so derive the expected value the same

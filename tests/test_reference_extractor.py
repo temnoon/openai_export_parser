@@ -43,9 +43,7 @@ def _conversation_with_image_and_attachment():
 
 def test_extracts_asset_pointer_and_attachment():
     extractor = MediaReferenceExtractor()
-    refs = extractor.extract_all_references(
-        _conversation_with_image_and_attachment()
-    )
+    refs = extractor.extract_all_references(_conversation_with_image_and_attachment())
 
     assert len(refs["asset_pointers"]) == 1
     assert refs["asset_pointers"][0]["type"] == "file-service"
@@ -55,9 +53,7 @@ def test_extracts_asset_pointer_and_attachment():
 
 def test_get_all_file_ids_includes_pointer_and_attachment_ids():
     extractor = MediaReferenceExtractor()
-    refs = extractor.extract_all_references(
-        _conversation_with_image_and_attachment()
-    )
+    refs = extractor.extract_all_references(_conversation_with_image_and_attachment())
     file_ids = extractor.get_all_file_ids(refs)
 
     assert "file-FVJSQmYWxZwxkqvQbDudDl8H" in file_ids  # from asset_pointer

@@ -13,16 +13,34 @@ from typing import Dict, List, Set
 class MediaIndexer:
     """Builds an index mapping conversation IDs to media files."""
 
-    MEDIA_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf', '.svg', '.mp3', '.wav', '.mp4', '.mov'}
+    MEDIA_EXTENSIONS = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".pdf",
+        ".svg",
+        ".mp3",
+        ".wav",
+        ".mp4",
+        ".mov",
+    }
 
     def __init__(self, verbose=False):
         self.verbose = verbose
         self.conversation_media = {}  # conversation_id -> list of file paths
         self.file_id_to_path = {}  # file-ID -> file path
         self.file_hash_to_path = {}  # file_{hash} -> file path (for sediment://)
-        self.size_to_paths = {}  # file_size -> list of file paths (for DALL-E generations)
-        self.size_gen_id_to_path = {}  # (file_size, gen_id) -> file path (for collision resolution)
-        self.filename_size_to_path = {}  # (filename, size) -> file path (for files without file-ID prefix)
+        self.size_to_paths = (
+            {}
+        )  # file_size -> list of file paths (for DALL-E generations)
+        self.size_gen_id_to_path = (
+            {}
+        )  # (file_size, gen_id) -> file path (for collision resolution)
+        self.filename_size_to_path = (
+            {}
+        )  # (filename, size) -> file path (for files without file-ID prefix)
 
     def log(self, msg):
         """Print log message if verbose mode is enabled."""
@@ -119,7 +137,7 @@ class MediaIndexer:
         size_to_paths = {}
         dalle_generation_files = 0
         for root, dirs, files in os.walk(tmp_dir):
-            if 'dalle-generations' in root:
+            if "dalle-generations" in root:
                 for filename in files:
                     filepath = os.path.join(root, filename)
                     _, ext = os.path.splitext(filename.lower())
@@ -159,12 +177,18 @@ class MediaIndexer:
             conversation_id if found, None otherwise
         """
         # UUID pattern: 8-4-4-4-12 hex characters
-        match = re.search(r'/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/', filepath)
+        match = re.search(
+            r"/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/",
+            filepath,
+        )
         if match:
             return match.group(1)
 
         # Also try 8-4-4-4-4-8 pattern (some UUIDs have this format)
-        match = re.search(r'/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{8})/', filepath)
+        match = re.search(
+            r"/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{8})/",
+            filepath,
+        )
         if match:
             return match.group(1)
 
@@ -197,12 +221,12 @@ class MediaIndexer:
             file-ID (e.g., "file-CSDzgtOhPLr3NzxdVkRcDgEC") if found, None otherwise
         """
         # Try underscore separator first (most common)
-        match = re.match(r'(file-[A-Za-z0-9]+)_', filename)
+        match = re.match(r"(file-[A-Za-z0-9]+)_", filename)
         if match:
             return match.group(1)
 
         # Try hyphen separator (less common, but exists)
-        match = re.match(r'(file-[A-Za-z0-9]+)-', filename)
+        match = re.match(r"(file-[A-Za-z0-9]+)-", filename)
         if match:
             return match.group(1)
 
@@ -222,7 +246,7 @@ class MediaIndexer:
             "file_{hash}" (e.g., "file_000000009e586230866e2a177650b0e8") if found, None otherwise
         """
         # Match: file_{16 hex chars}-{uuid}.ext
-        match = re.match(r'(file_[a-f0-9]{32})-[a-f0-9-]{36}\.', filename)
+        match = re.match(r"(file_[a-f0-9]{32})-[a-f0-9-]{36}\.", filename)
         if match:
             return match.group(1)
         return None
@@ -238,10 +262,14 @@ class MediaIndexer:
             True if filename matches UUID pattern
         """
         # Standard UUID: 8-4-4-4-12
-        if re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', filename):
+        if re.match(
+            r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", filename
+        ):
             return True
         # iOS UUID: 8-4-4-4-12 (uppercase)
-        if re.match(r'^[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$', filename):
+        if re.match(
+            r"^[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}$", filename
+        ):
             return True
         return False
 
@@ -276,15 +304,26 @@ class MediaIndexer:
         Returns:
             Dictionary with statistics
         """
-        total_dalle_files = sum(len(files) for files in self.conversation_media.values())
-        total_dalle_generation_files = sum(len(files) for files in self.size_to_paths.values())
+        total_dalle_files = sum(
+            len(files) for files in self.conversation_media.values()
+        )
+        total_dalle_generation_files = sum(
+            len(files) for files in self.size_to_paths.values()
+        )
 
         return {
-            'total_conversations_with_media': len(self.conversation_media),
-            'total_dalle_files': total_dalle_files,
-            'total_file_id_files': len(self.file_id_to_path),
-            'total_file_hash_files': len(self.file_hash_to_path),
-            'total_dalle_generation_files': total_dalle_generation_files,
-            'total_media_files': total_dalle_files + len(self.file_id_to_path) + len(self.file_hash_to_path) + total_dalle_generation_files,
-            'avg_files_per_conversation': total_dalle_files / len(self.conversation_media) if self.conversation_media else 0
+            "total_conversations_with_media": len(self.conversation_media),
+            "total_dalle_files": total_dalle_files,
+            "total_file_id_files": len(self.file_id_to_path),
+            "total_file_hash_files": len(self.file_hash_to_path),
+            "total_dalle_generation_files": total_dalle_generation_files,
+            "total_media_files": total_dalle_files
+            + len(self.file_id_to_path)
+            + len(self.file_hash_to_path)
+            + total_dalle_generation_files,
+            "avg_files_per_conversation": (
+                total_dalle_files / len(self.conversation_media)
+                if self.conversation_media
+                else 0
+            ),
         }

@@ -42,9 +42,7 @@ class TestExtractFileId:
     def test_non_file_id_names_return_none(self):
         assert self.idx._extract_file_id("photo-1234.jpeg") is None
         assert (
-            self.idx._extract_file_id(
-                "12345678-1234-1234-1234-123456789abc.jpg"
-            )
+            self.idx._extract_file_id("12345678-1234-1234-1234-123456789abc.jpg")
             is None
         )
 

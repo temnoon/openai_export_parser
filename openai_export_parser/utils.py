@@ -14,7 +14,7 @@ def ensure_dir(path):
 # data descriptors. Python's zipfile (and Info-ZIP unzip / bsdtar) cannot read
 # members past this point — only streaming extractors (macOS ditto / Archive
 # Utility) succeed. For such archives we skip straight to ditto on macOS.
-_ZIP64_WRAP_THRESHOLD = 4 * 1024 ** 3
+_ZIP64_WRAP_THRESHOLD = 4 * 1024**3
 
 
 def unzip(src, dst):
@@ -38,10 +38,13 @@ def unzip(src, dst):
 
     if too_big and sys.platform == "darwin":
         import subprocess
+
         try:
             subprocess.run(
                 ["ditto", "-x", "-k", src, dst],
-                check=True, capture_output=True, text=True
+                check=True,
+                capture_output=True,
+                text=True,
             )
             return
         except (subprocess.CalledProcessError, FileNotFoundError):
@@ -64,7 +67,7 @@ def unzip(src, dst):
                     ["ditto", "-x", "-k", src, dst],
                     check=True,
                     capture_output=True,
-                    text=True
+                    text=True,
                 )
                 return
             except (subprocess.CalledProcessError, FileNotFoundError):
@@ -73,9 +76,7 @@ def unzip(src, dst):
         # Try system unzip command
         try:
             result = subprocess.run(
-                ["unzip", "-q", "-o", src, "-d", dst],
-                capture_output=True,
-                text=True
+                ["unzip", "-q", "-o", src, "-d", dst], capture_output=True, text=True
             )
 
             # Check if files were actually extracted (even with warnings)
@@ -88,10 +89,7 @@ def unzip(src, dst):
             # No files extracted
             if result.returncode != 0:
                 raise subprocess.CalledProcessError(
-                    result.returncode,
-                    result.args,
-                    result.stdout,
-                    result.stderr
+                    result.returncode, result.args, result.stdout, result.stderr
                 )
 
         except subprocess.CalledProcessError as cmd_error:

@@ -70,10 +70,10 @@ class MediaReferenceExtractor:
         }
         """
         references = {
-            'asset_pointers': [],
-            'attachments': [],
-            'dalle_generations': [],
-            'text_references': []
+            "asset_pointers": [],
+            "attachments": [],
+            "dalle_generations": [],
+            "text_references": [],
         }
 
         mapping = conversation.get("mapping", {})
@@ -109,58 +109,58 @@ class MediaReferenceExtractor:
         asset_pointer = part.get("asset_pointer", "")
         if asset_pointer:
             ref = {
-                'pointer': asset_pointer,
-                'size_bytes': part.get("size_bytes"),
-                'width': part.get("width"),
-                'height': part.get("height"),
-                'metadata': part.get("metadata", {})
+                "pointer": asset_pointer,
+                "size_bytes": part.get("size_bytes"),
+                "width": part.get("width"),
+                "height": part.get("height"),
+                "metadata": part.get("metadata", {}),
             }
 
             # Classify by pointer type
             if asset_pointer.startswith("sediment://"):
-                ref['type'] = 'sediment'
-                ref['file_hash'] = asset_pointer.replace("sediment://", "")
-                references['asset_pointers'].append(ref)
+                ref["type"] = "sediment"
+                ref["file_hash"] = asset_pointer.replace("sediment://", "")
+                references["asset_pointers"].append(ref)
 
             elif asset_pointer.startswith("file-service://"):
-                ref['type'] = 'file-service'
+                ref["type"] = "file-service"
 
                 # Check for DALL-E metadata
                 metadata = part.get("metadata") or {}
                 dalle_metadata = metadata.get("dalle", {})
                 if dalle_metadata:
                     gen_ref = {
-                        'gen_id': dalle_metadata.get("gen_id"),
-                        'size_bytes': part.get("size_bytes"),
-                        'width': part.get("width"),
-                        'height': part.get("height"),
-                        'asset_pointer': asset_pointer,
-                        'dalle_metadata': dalle_metadata
+                        "gen_id": dalle_metadata.get("gen_id"),
+                        "size_bytes": part.get("size_bytes"),
+                        "width": part.get("width"),
+                        "height": part.get("height"),
+                        "asset_pointer": asset_pointer,
+                        "dalle_metadata": dalle_metadata,
                     }
-                    references['dalle_generations'].append(gen_ref)
+                    references["dalle_generations"].append(gen_ref)
 
-                references['asset_pointers'].append(ref)
+                references["asset_pointers"].append(ref)
 
             elif asset_pointer.startswith("file://"):
-                ref['type'] = 'file'
+                ref["type"] = "file"
                 # Extract filename from file:// URL if possible
                 filename = asset_pointer.replace("file://", "").split("/")[-1]
-                ref['filename'] = filename
-                references['asset_pointers'].append(ref)
+                ref["filename"] = filename
+                references["asset_pointers"].append(ref)
 
             else:
                 # Unknown pointer type
-                ref['type'] = 'unknown'
-                references['asset_pointers'].append(ref)
+                ref["type"] = "unknown"
+                references["asset_pointers"].append(ref)
 
     def _extract_from_text(self, text: str, references: Dict):
         """Extract media references from text content."""
 
         # Look for common filename patterns
         filename_patterns = [
-            r'[\w\-]+\.(jpg|jpeg|png|gif|webp|pdf|mp3|wav|mp4|mov)',
-            r'file-[A-Za-z0-9]+',  # file-IDs
-            r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'  # UUIDs
+            r"[\w\-]+\.(jpg|jpeg|png|gif|webp|pdf|mp3|wav|mp4|mov)",
+            r"file-[A-Za-z0-9]+",  # file-IDs
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",  # UUIDs
         ]
 
         for pattern in filename_patterns:
@@ -171,11 +171,8 @@ class MediaReferenceExtractor:
                 end = min(len(text), match.end() + 50)
                 context = text[start:end]
 
-                ref = {
-                    'match': match.group(0),
-                    'context': context
-                }
-                references['text_references'].append(ref)
+                ref = {"match": match.group(0), "context": context}
+                references["text_references"].append(ref)
 
     def _extract_from_metadata(self, metadata: Dict, references: Dict):
         """Extract media references from message metadata."""
@@ -184,39 +181,39 @@ class MediaReferenceExtractor:
         attachments = metadata.get("attachments", [])
         for attachment in attachments:
             ref = {
-                'id': attachment.get("id"),
-                'name': attachment.get("name"),
-                'size': attachment.get("size"),
-                'mime_type': attachment.get("mimeType"),
-                'width': attachment.get("width"),
-                'height': attachment.get("height")
+                "id": attachment.get("id"),
+                "name": attachment.get("name"),
+                "size": attachment.get("size"),
+                "mime_type": attachment.get("mimeType"),
+                "width": attachment.get("width"),
+                "height": attachment.get("height"),
             }
-            references['attachments'].append(ref)
+            references["attachments"].append(ref)
 
     def count_references(self, references: Dict) -> Dict:
         """Count references by type."""
         return {
-            'asset_pointers': len(references.get('asset_pointers', [])),
-            'attachments': len(references.get('attachments', [])),
-            'dalle_generations': len(references.get('dalle_generations', [])),
-            'text_references': len(references.get('text_references', []))
+            "asset_pointers": len(references.get("asset_pointers", [])),
+            "attachments": len(references.get("attachments", [])),
+            "dalle_generations": len(references.get("dalle_generations", [])),
+            "text_references": len(references.get("text_references", [])),
         }
 
     def get_all_sizes(self, references: Dict) -> Set[int]:
         """Get all unique file sizes mentioned in references."""
         sizes = set()
 
-        for ref in references.get('asset_pointers', []):
-            if ref.get('size_bytes'):
-                sizes.add(ref['size_bytes'])
+        for ref in references.get("asset_pointers", []):
+            if ref.get("size_bytes"):
+                sizes.add(ref["size_bytes"])
 
-        for ref in references.get('attachments', []):
-            if ref.get('size'):
-                sizes.add(ref['size'])
+        for ref in references.get("attachments", []):
+            if ref.get("size"):
+                sizes.add(ref["size"])
 
-        for ref in references.get('dalle_generations', []):
-            if ref.get('size_bytes'):
-                sizes.add(ref['size_bytes'])
+        for ref in references.get("dalle_generations", []):
+            if ref.get("size_bytes"):
+                sizes.add(ref["size_bytes"])
 
         return sizes
 
@@ -225,23 +222,23 @@ class MediaReferenceExtractor:
         file_ids = set()
 
         # Extract from asset_pointers (file-service://file-XXXXX)
-        for ref in references.get('asset_pointers', []):
-            pointer = ref.get('pointer', '')
-            if pointer.startswith('file-service://'):
+        for ref in references.get("asset_pointers", []):
+            pointer = ref.get("pointer", "")
+            if pointer.startswith("file-service://"):
                 # Extract file-ID from URL: file-service://file-XXXXX
-                file_id = pointer.replace('file-service://', '')
-                if file_id.startswith('file-'):
+                file_id = pointer.replace("file-service://", "")
+                if file_id.startswith("file-"):
                     file_ids.add(file_id)
 
         # Extract from attachments
-        for ref in references.get('attachments', []):
-            if ref.get('id'):
-                file_ids.add(ref['id'])
+        for ref in references.get("attachments", []):
+            if ref.get("id"):
+                file_ids.add(ref["id"])
 
         # Extract from text references
-        for ref in references.get('text_references', []):
-            match = ref.get('match', '')
-            if match.startswith('file-'):
+        for ref in references.get("text_references", []):
+            match = ref.get("match", "")
+            if match.startswith("file-"):
                 file_ids.add(match)
 
         return file_ids
@@ -250,9 +247,9 @@ class MediaReferenceExtractor:
         """Get all file hashes (sediment://) mentioned in references."""
         hashes = set()
 
-        for ref in references.get('asset_pointers', []):
-            if ref.get('type') == 'sediment' and ref.get('file_hash'):
-                hashes.add(ref['file_hash'])
+        for ref in references.get("asset_pointers", []):
+            if ref.get("type") == "sediment" and ref.get("file_hash"):
+                hashes.add(ref["file_hash"])
 
         return hashes
 
@@ -260,14 +257,14 @@ class MediaReferenceExtractor:
         """Get all filenames mentioned in references."""
         filenames = set()
 
-        for ref in references.get('attachments', []):
-            if ref.get('name'):
-                filenames.add(ref['name'])
+        for ref in references.get("attachments", []):
+            if ref.get("name"):
+                filenames.add(ref["name"])
 
-        for ref in references.get('text_references', []):
-            match = ref.get('match', '')
+        for ref in references.get("text_references", []):
+            match = ref.get("match", "")
             # Check if it looks like a filename (has extension)
-            if '.' in match and not match.startswith('file-'):
+            if "." in match and not match.startswith("file-"):
                 filenames.add(match)
 
         return filenames
