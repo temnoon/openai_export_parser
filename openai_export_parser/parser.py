@@ -86,10 +86,10 @@ class ExportParser:
         # Build comprehensive media index from directory structure
         self.log("Building comprehensive media index...")
 
-        # Add recovery folder for files from old exports (Session 8 recovery)
+        # Optional recovery folder for media salvaged from older exports.
+        # Defaults to a "recovered_files/" directory at the project root; if it
+        # doesn't exist the indexer simply skips it.
         recovery_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "recovered_files")
-        if not os.path.exists(recovery_dir):
-            recovery_dir = "/Users/tem/openai-export-parser/recovered_files"  # Fallback to absolute path
 
         file_indices = self.indexer.build_index(tmp_dir, recovery_dir=recovery_dir)
 

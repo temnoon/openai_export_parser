@@ -195,7 +195,7 @@ file_id_index = {
 
 ## Testing
 
-Test file: `/Users/tem/openai-export-parser/tests/test_media_matcher.py`
+Test file: `tests/test_media_matcher.py`
 
 Key test cases:
 - `test_match_direct_filename` - Direct basename matching

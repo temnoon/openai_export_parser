@@ -30,7 +30,7 @@ The original media matching system made assumptions about file naming patterns a
   - `size_to_paths`: `size -> [paths]` (for size-based matching)
   - `path_to_metadata`: Full metadata for each file
 
-**File**: `/Users/tem/openai-export-parser/openai_export_parser/comprehensive_media_indexer.py`
+**File**: `openai_export_parser/comprehensive_media_indexer.py`
 
 **Key improvement**: Makes NO assumptions about where files are located or how they're named.
 
@@ -47,7 +47,7 @@ The original media matching system made assumptions about file naming patterns a
   - Text content (filenames, UUIDs)
 - Returns structured dict with all reference types
 
-**File**: `/Users/tem/openai-export-parser/openai_export_parser/media_reference_extractor.py`
+**File**: `openai_export_parser/media_reference_extractor.py`
 
 **Key improvement**: Finds references EVERYWHERE, not just in expected locations.
 
@@ -64,7 +64,7 @@ The original media matching system made assumptions about file naming patterns a
 6. **Size only** - Fallback, may have collisions
 7. **Filename only** - Least reliable, last resort
 
-**File**: `/Users/tem/openai-export-parser/openai_export_parser/comprehensive_media_matcher.py`
+**File**: `openai_export_parser/comprehensive_media_matcher.py`
 
 **Key improvement**: Tries multiple strategies, provides detailed logging of what matched and what didn't.
 
@@ -115,11 +115,11 @@ The comprehensive system correctly:
 ## Integration Status
 
 **Created**:
-- `/Users/tem/openai-export-parser/openai_export_parser/comprehensive_media_indexer.py` ✓
-- `/Users/tem/openai-export-parser/openai_export_parser/media_reference_extractor.py` ✓
-- `/Users/tem/openai-export-parser/openai_export_parser/comprehensive_media_matcher.py` ✓
-- `/Users/tem/openai-export-parser/test_comprehensive_matching.py` ✓
-- `/Users/tem/openai-export-parser/test_elderly_man_matching.py` ✓
+- `openai_export_parser/comprehensive_media_indexer.py` ✓
+- `openai_export_parser/media_reference_extractor.py` ✓
+- `openai_export_parser/comprehensive_media_matcher.py` ✓
+- `test_comprehensive_matching.py` ✓
+- `test_elderly_man_matching.py` ✓
 
 **Tested**:
 - Journal Cover conversation (missing file detection) ✓

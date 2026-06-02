@@ -37,7 +37,7 @@ File-abc123                             (capital F breaks pattern)
 
 ### Code Flow (MediaIndexer)
 
-**File:** `/Users/tem/openai-export-parser/openai_export_parser/media_indexer.py`
+**File:** `openai_export_parser/media_indexer.py`
 **Function:** `_extract_file_id_from_name()` (Lines 176-200)
 
 ```python
@@ -108,7 +108,7 @@ Reason:   Filename doesn't START with file-{ID}_ or file-{ID}-
 
 ### Code Flow (MediaMatcher)
 
-**File:** `/Users/tem/openai-export-parser/openai_export_parser/media_matcher.py`
+**File:** `openai_export_parser/media_matcher.py`
 **Function:** `_match_by_file_id()` (Lines 129-167)
 
 ```python
@@ -327,7 +327,7 @@ stats['file_id_matches'] += 0  # ✗ NO MATCH
 
 ### Code Flow (MediaMatcher)
 
-**File:** `/Users/tem/openai-export-parser/openai_export_parser/media_matcher.py`
+**File:** `openai_export_parser/media_matcher.py`
 **Function:** `_match_by_text_content()` (Lines 328-363)
 
 ```python

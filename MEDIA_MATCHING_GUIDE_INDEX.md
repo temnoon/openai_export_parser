@@ -201,7 +201,7 @@ Files must follow specific naming patterns to be indexed:
 
 All documents are in the project root:
 ```
-/Users/tem/openai-export-parser/
+.
 ├── QUICK_REFERENCE.md (START HERE!)
 ├── MEDIA_MATCHER_ANALYSIS.md
 ├── FILE_ID_CODE_EXAMPLES.md
