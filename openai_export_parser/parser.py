@@ -255,6 +255,11 @@ class ExportParser:
             with open(index_html_path, "w", encoding="utf-8") as f:
                 f.write(index_html)
 
+            # Drop in a double-clickable viewer launcher. The output is static
+            # files, but browsers sandbox file:// pages (broken cross-folder
+            # links, blocked local images), so serve it over http:// instead.
+            self._write_viewer_launcher(out_dir)
+
         # Create global index (JSON)
         index = {
             "conversation_count": len(conversations),
@@ -271,6 +276,36 @@ class ExportParser:
         if self.output_format in ["html", "both"]:
             self.log(f"✅ Generated HTML viewer with {len(conversations)} conversation pages")
         self.log(f"✅ Processed {len(self.media_files)} media file references")
+
+    def _write_viewer_launcher(self, out_dir):
+        """
+        Write a double-clickable `view.command` (macOS) into the output folder
+        that serves the archive over http:// and opens the master index.
+
+        Viewing the output directly from disk (file://) breaks cross-folder
+        links and blocks local images; a local web server avoids both.
+        """
+        launcher = (
+            "#!/bin/bash\n"
+            "# Double-click this file to browse the export.\n"
+            "# It starts a tiny local web server in this folder and opens the\n"
+            "# index. Browsing over http:// avoids the file:// restrictions that\n"
+            "# break conversation links and media in most browsers.\n"
+            'cd "$(dirname "$0")" || exit 1\n'
+            "PORT=8770\n"
+            'while lsof -i :"$PORT" >/dev/null 2>&1; do PORT=$((PORT+1)); done\n'
+            'echo "Serving this export at http://localhost:$PORT/"\n'
+            'echo "Close this window (or press Ctrl-C) to stop the server."\n'
+            '( sleep 1; open "http://localhost:$PORT/index.html" ) &\n'
+            'exec python3 -m http.server "$PORT"\n'
+        )
+        launcher_path = os.path.join(out_dir, "view.command")
+        try:
+            with open(launcher_path, "w", encoding="utf-8") as f:
+                f.write(launcher)
+            os.chmod(launcher_path, 0o755)
+        except OSError as e:
+            self.log(f"Could not write viewer launcher: {e}")
 
     def _write_flat_output(self, conversations, schemas, out_dir):
         """

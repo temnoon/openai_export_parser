@@ -1,79 +1,133 @@
 # openai-export-parser
 
-[![Tests](https://github.com/temnoon/openai-export-parser/workflows/Tests/badge.svg)](https://github.com/temnoon/openai-export-parser/actions)
-[![Python Version](https://img.shields.io/pypi/pyversions/openai-export-parser.svg)](https://pypi.org/project/openai-export-parser/)
+[![Tests](https://github.com/temnoon/openai_export_parser/workflows/Tests/badge.svg)](https://github.com/temnoon/openai_export_parser/actions)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**A comprehensive parser for OpenAI ChatGPT and Claude conversation exports with advanced media matching, audio transcripts, and beautiful HTML output.**
+**Turn your ChatGPT (and Claude) data export into a browsable, self-contained archive — every conversation in its own folder, with its images, audio, and files restored and a searchable HTML viewer to read it all.**
 
-Parse both OpenAI's complex nested export.zip files and Claude's conversation exports into organized, browsable conversations with automatic media matching, voice transcripts, and a complete HTML viewer.
+OpenAI's export is a pile of nested zips and opaque JSON; the images are stored
+under cryptic IDs (and, in recent exports, with their file extensions stripped
+to `.dat`). This tool untangles all of that into something you can actually
+read, search, and keep.
 
-## ✨ Key Features
+> ✅ **Updated for the latest 2026 ChatGPT export format** — the new multi-gigabyte,
+> split-zip layout with `.dat` media files. See [Supported formats](#-supported-export-formats).
 
-### 🎙️ **Voice Mode Support**
-- **Audio Transcripts** - Automatically extracts and displays voice message transcripts
-- **Audio Playback** - Embedded HTML5 audio players with controls for all voice conversations
-- **Full WAV Support** - Plays back original voice recordings directly in the browser
+---
 
-### 🖼️ **Advanced Media Matching**
-- **7-Strategy Matching** - Links images, audio, and files to messages using multiple algorithms
-- **DALL-E Images** - Handles generated images with metadata and prompts
-- **File Recovery** - Can incorporate media from old exports to fill gaps
-- **97.9% Match Rate** - Industry-leading accuracy for media file matching
+## 👋 New here? Start in 3 steps
 
-### 📱 **Beautiful HTML Viewer**
-- **Standalone HTML** - Each conversation as a self-contained, shareable HTML file
-- **Master Index** - Browse all conversations with search, filtering, and categories
-- **Dark Mode** - Automatic theme switching based on system preferences
-- **Markdown Rendering** - Full support for formatted text, code blocks, and LaTeX math
-- **Syntax Highlighting** - Code blocks with language-aware highlighting
-- **Responsive Design** - Works perfectly on desktop and mobile
-
-### 🔧 **Robust Processing**
-- **Multi-Platform Support** - Parses both OpenAI ChatGPT and Claude conversation exports
-- **Auto-Detection** - Automatically detects export type (OpenAI or Claude)
-- **Recursive Zip Extraction** - Handles arbitrarily nested zip archives
-- **Malformed Zip Recovery** - Works with corrupted exports using fallback extraction
-- **Schema Inference** - Future-proof against format changes
-- **Progress Tracking** - Real-time progress bars for long operations
-- **Error Recovery** - Gracefully handles incomplete or partial exports
-
-### 📊 **Organization & Discovery**
-- **Smart Folder Naming** - Conversations organized by date and title
-- **Category Symlinks** - Quick access to conversations with media or assets
-- **Search & Filter** - Find conversations by title, date, or content
-- **Statistics Dashboard** - Overview of your conversation archive
-
-## Installation
+**1. Get the tool**
 
 ```bash
-pip install openai-export-parser
-```
-
-Or install from source:
-
-```bash
-git clone https://github.com/temnoon/openai-export-parser.git
-cd openai-export-parser
+git clone git@github.com:temnoon/openai_export_parser.git
+cd openai_export_parser
 pip install -e .
 ```
 
-## Quick Start
-
-### Command Line
+**2. Point it at your export**
 
 ```bash
-# OpenAI ChatGPT export - automatically detected
+openai-export-parser ~/Downloads/OpenAI-export.zip -o ~/Desktop/my-chatgpt-archive -v
+```
+
+(`-o` is where the output goes, `-v` shows progress. The export type — OpenAI or
+Claude — is detected automatically.)
+
+**3. Read your archive**
+
+Open the output folder and double-click **`view.command`** (macOS). It starts a
+tiny local web server and opens the master index in your browser.
+
+> **Why not just double-click `index.html`?** Browsers sandbox pages opened as
+> `file://`, which breaks links between conversations and stops images from
+> loading. Viewing over a local `http://` server (what `view.command` does) makes
+> everything work. See [Viewing your archive](#-viewing-your-archive).
+
+That's it. You now have every conversation as its own folder plus a searchable
+index of the whole archive.
+
+### Where do I get my ChatGPT export?
+
+1. In ChatGPT: **Settings → Data controls → Export data**.
+2. Confirm. OpenAI emails you a download link (it expires in ~24 hours).
+3. Download the `.zip` — that's the file you feed to this tool. Large accounts
+   come as a single multi-GB zip containing several inner zips; that's expected
+   and supported.
+
+---
+
+## ✨ Key Features
+
+### 🖼️ Restores your media
+- **Matches images, audio, and files** back to the messages that reference them,
+  using a multi-strategy matcher (file-ID, content hash, filename+size, and more).
+- **Recovers stripped extensions** — recent exports store every asset as a
+  generic `.dat`; the parser sniffs each file's real type (PNG/JPEG/PDF/WAV/…)
+  so it displays correctly.
+- **DALL·E images & uploads** alike, with dimensions and metadata preserved.
+
+### 📱 Beautiful, self-contained HTML viewer
+- **One HTML file per conversation** — shareable and fully offline.
+- **Master index** with live search, filtering, and stats.
+- **Dark mode**, **Markdown + LaTeX** rendering, and **syntax-highlighted** code.
+- **Responsive** — works on desktop and mobile.
+
+### 🎙️ Voice mode support
+- Extracts **voice transcripts** and embeds **HTML5 audio players** so you can
+  re-listen to original recordings.
+
+### 🔧 Robust, real-world processing
+- **Handles the broken multi-GB zips OpenAI actually ships** (see
+  [How it handles giant exports](#-how-it-handles-giant-exports)).
+- **Recursive zip extraction** for arbitrarily nested archives.
+- **Auto-detects** OpenAI vs Claude exports.
+- **Graceful recovery** from incomplete or partial exports.
+
+### 📊 Organization & discovery
+- **Smart folder names** — `YYYY-MM-DD_Title_NNNNN`.
+- **Shortcut folders** — `_with_media/` and `_with_assets/` for quick browsing.
+- **Search & filter** by title, date, length, and content.
+
+---
+
+## 📦 Installation
+
+**From source (recommended):**
+
+```bash
+git clone git@github.com:temnoon/openai_export_parser.git
+cd openai_export_parser
+pip install -e .
+```
+
+Requires **Python 3.8+**. The only runtime dependencies are `tqdm` and
+`python-dateutil` (installed automatically). On **macOS**, giant exports are
+extracted with the built-in `ditto` tool — no extra install needed.
+
+---
+
+## 🚀 Usage
+
+### Command line
+
+```bash
+# OpenAI ChatGPT export (auto-detected)
 openai-export-parser export.zip
 
-# Claude conversation export - automatically detected
+# Claude conversation export (auto-detected)
 openai-export-parser claude_data_export.zip
 
-# Specify output directory
-openai-export-parser export.zip -o my_conversations
+# Choose an output directory and show progress
+openai-export-parser export.zip -o my_conversations -v
 
-# Enable verbose logging
-openai-export-parser export.zip -v
+# JSON only (skip HTML), or HTML only
+openai-export-parser export.zip --output-format json
+openai-export-parser export.zip --output-format html
+
+# Legacy flat layout instead of per-conversation folders
+openai-export-parser export.zip --flat
 ```
 
 ### Python API
@@ -81,284 +135,218 @@ openai-export-parser export.zip -v
 ```python
 from openai_export_parser import ExportParser
 
-parser = ExportParser(verbose=True)
-parser.parse_export("export.zip", "output_directory")
+parser = ExportParser(verbose=True)              # output_format="both" by default
+parser.parse_export("export.zip", "output_dir")
 ```
 
-## Output Structure
+---
 
-```
-output/
-├── index.html                          # Master index - start here!
-├── index.json                          # Metadata
-├── _with_media/                        # Symlinks to conversations with images/audio
-├── _with_assets/                       # Symlinks to conversations with files
-├── 2025-11-06_OpenAI_export.zip_documentation_00001/
-│   ├── conversation.html               # Standalone HTML viewer
-│   ├── conversation.json               # Full conversation data
-│   ├── media/                          # Images, audio files, etc.
-│   │   ├── image_abc123.png
-│   │   └── audio_xyz789.wav
-│   └── media_manifest.json             # Media file mappings
-└── [... more conversation folders]
-```
+## 🖥️ Viewing your archive
 
-## HTML Viewer Features
+The output is **static files**, but browsers restrict pages opened directly from
+disk (`file://`): cross-folder links and local images silently fail. Serve the
+folder over `http://` instead — any of these work:
 
-Open `output/index.html` in your browser to access:
+**Easiest (macOS):** double-click **`view.command`** in the output folder. It
+finds a free port, starts a local server, and opens the index for you. Close the
+Terminal window to stop it.
 
-- **Searchable conversation list** with title, date, and message count
-- **Filter by date range** or media presence
-- **Dark/light mode toggle** with persistence
-- **Click any conversation** to view the full HTML with:
-  - Formatted markdown text
-  - Embedded images (DALL-E and uploads)
-  - Audio players for voice messages with transcripts
-  - Code syntax highlighting
-  - LaTeX math rendering
-  - Conversation metadata and timestamps
-
-### Voice Conversation Example
-
-Voice messages display with:
-1. **Transcript text** - Full text of what was said
-2. **Audio player** - HTML5 controls to listen to the original recording
-3. **Duration display** - Length of audio clip
-4. **Direction indicator** - User vs Assistant audio
-
-## Media Matching Strategies
-
-The parser uses 7 different strategies to match media files:
-
-1. **File Hash Matching** - Direct hash lookup for `sediment://` URLs
-2. **File-ID Matching** - OpenAI file identifiers (`file-XXX`)
-3. **Filename + Size** - Exact filename and byte size
-4. **Conversation Directory** - Files in conversation-specific folders
-5. **Size + Metadata** - File size with DALL-E generation metadata
-6. **Size Only** - Fallback matching by file size
-7. **Filename Only** - Last resort filename-based matching
-
-## Advanced Features
-
-### Recovery Folder Integration
-
-To incorporate media from old exports:
+**Manual (any OS):**
 
 ```bash
-# Place old media files in recovered_files/
-mkdir recovered_files
-cp -r old_export/media/* recovered_files/
-
-# Parser automatically includes them
-openai-export-parser new_export.zip -o output
+cd your-output-folder
+python3 -m http.server 8000
+# then open http://localhost:8000/index.html
 ```
 
-The parser will index both the new export and recovered files, maximizing match rates.
+In the viewer you can search and filter the conversation list, toggle dark mode,
+and click into any conversation to see formatted text, inline images, audio
+players, highlighted code, and rendered math.
 
-### Programmatic Access
+---
 
-```python
-from openai_export_parser import ExportParser
+## 📁 Output structure
 
-class CustomParser(ExportParser):
-    def normalize_conversations(self, conversations):
-        # Add custom processing
-        conversations = super().normalize_conversations(conversations)
-
-        for conv in conversations:
-            # Extract statistics, filter content, etc.
-            conv["message_count"] = len(conv.get("messages", []))
-
-        return conversations
-
-parser = CustomParser(verbose=True)
-parser.parse_export("export.zip", "output")
+```
+my-chatgpt-archive/
+├── index.html                     # Master index — start here (serve over http://)
+├── index.json                     # Archive metadata + stats
+├── view.command                   # Double-click to launch the local viewer (macOS)
+├── _with_media/                   # Shortcuts to conversations that have media
+├── _with_assets/                  # Shortcuts to conversations with code/canvas assets
+├── 2023-10-04_Cosmic_Surreal_Art_Creation_01397/
+│   ├── conversation.html          # Standalone, offline-capable viewer
+│   ├── conversation.json          # Full original conversation data (mapping tree)
+│   ├── media/                     # Restored images / audio (real extensions)
+│   │   └── f6f61065525a_file-aZlh7eXXkKmbAT3s8OUOyknk.png
+│   ├── media_manifest.json        # Maps original asset names → stored files
+│   └── assets/                    # Extracted code blocks / canvas artifacts
+└── … one folder per conversation
 ```
 
-### Integration with Memory Systems
+> Note: `view.command` is written into the output folder by the bundled viewer
+> helper; if your output predates it, just use the manual `http.server` command
+> above.
 
-The output is optimized for ingestion into vector databases:
+---
 
-```python
-import json
-from pathlib import Path
-from openai_export_parser import ExportParser
+## 🧩 Supported export formats
 
-# Parse export
-parser = ExportParser()
-parser.parse_export("export.zip", "parsed")
+OpenAI has changed the export format **many times**. This parser is built to
+absorb those changes; here's what it handles today.
 
-# Load for vector embedding
-for conv_file in Path("parsed").glob("*/conversation.json"):
-    with open(conv_file) as f:
-        conv = json.load(f)
+### OpenAI ChatGPT
 
-    for node in conv["mapping"].values():
-        msg = node.get("message")
-        if not msg:
-            continue
+| Era | Shape | Media | Status |
+|-----|-------|-------|--------|
+| **2026 (latest)** | One outer zip wrapping `Conversations__…part-00N.zip` + `Files__…files-00N.zip`, plus `Financial/`, `User Profile/`, etc. Conversations sharded as `conversations-NNN.json`. | Assets stored as **`file-<ID>.dat`** (extension stripped) and `personal/files/<name>` uploads. | ✅ Fully supported |
+| **2024–2025** | Nested zips; `conversations.json` or sharded JSON. | `file-service://` and `sediment://` pointers; `dalle-generations/`, `user-…/`, `{uuid}/audio/`. | ✅ Supported |
+| **Pre-2024** | Single `conversations.json`, flat media. | Simple filenames. | ✅ Supported |
 
-        # Extract text content
-        content = msg.get("content", {})
-        text = ""
+All OpenAI conversations use the **`mapping` tree** (a DAG of message nodes with
+`current_node`), which the parser linearizes for display. Media is referenced via
+`image_asset_pointer` parts (`file-service://file-<ID>`) and message
+`attachments`.
 
-        if content.get("content_type") == "text":
-            text = content.get("parts", [""])[0]
+### Claude
 
-        # Embed and store
-        metadata = {
-            "conversation_id": conv["conversation_id"],
-            "timestamp": msg.get("create_time"),
-            "role": msg.get("author", {}).get("role"),
-        }
-        # your_embedding_function(text, metadata)
+A single zip containing `conversations.json`, `projects.json`, and `users.json`,
+with a flat message structure. **Auto-detected** and converted to the same
+organized output. To export: **Settings → Privacy → Export data** in the Claude
+web or desktop app.
+
+---
+
+## 🐘 How it handles giant exports
+
+Large ChatGPT accounts export as a single zip **bigger than 4 GiB** — and OpenAI
+writes these as **non-ZIP64 archives whose internal offsets wrap at the 4 GiB
+boundary**, with members stored using data descriptors. The practical result:
+
+- `unzip`, `bsdtar`, and even Python's own `zipfile` **fail** on any file past
+  the 4 GiB mark (`bad zipfile offset` / `Truncated file header`).
+- Only **streaming extractors** that read members sequentially can open them.
+
+So on macOS the parser sends any archive larger than 4 GiB straight to
+**`ditto`** (the same engine as Finder's Archive Utility), which extracts these
+archives correctly. Smaller and well-formed zips use the fast Python path. If a
+zip is merely corrupted, the parser still falls back through `ditto` → system
+`unzip`, accepting partial extractions when possible.
+
+**Rule of thumb:** if Finder's Archive Utility can open your export, this parser
+can too.
+
+---
+
+## 🔎 Media matching strategies
+
+The matcher tries several approaches, most reliable first, and de-duplicates hits:
+
+1. **Content hash** — `sediment://file_<hash>` → exact, content-addressed match.
+2. **File-ID** — `file-service://file-<ID>` → `file-<ID>.dat` / `file-<ID>-name.ext`
+   (handles the modern extension-stripped naming). *This carries most matches in
+   recent exports.*
+3. **Filename + size** — user uploads matched by original name and byte size.
+4. **Conversation directory** — files stored under a conversation's own folder.
+5. **Size + DALL·E metadata** — dimensions/generation id for generated images.
+6. **Size only** — fallback when a size is unique across the archive.
+7. **Filename only** — last-resort basename match.
+
+> Some references simply have **no file in the export** — OpenAI has, in some
+> periods, omitted image bytes entirely. Those show up as `UNMATCHED` in verbose
+> logs and are expected, not a bug.
+
+---
+
+## 🛠️ Troubleshooting
+
+**"`index.html` doesn't work / looks blank / links are dead."**
+You're opening it as `file://`. Serve the folder over `http://` instead — use
+`view.command` or `python3 -m http.server` (see
+[Viewing your archive](#-viewing-your-archive)).
+
+**"Bad magic number" / "Truncated file header" / extraction fails on a big zip.**
+That's the >4 GiB ZIP64 wrap issue above. On macOS the parser uses `ditto`
+automatically. If you're on Linux/Windows with a giant export, first extract the
+**outer** zip with a streaming tool (e.g. macOS Archive Utility, `7z`, or The
+Unarchiver) and run the parser against the extracted folder.
+
+**"No conversations found."**
+Confirm you passed the real export `.zip` (or its extracted folder). Re-run with
+`-v` and check the log for extraction errors.
+
+**"Images aren't showing."**
+Make sure you're viewing over `http://` (not `file://`). If a specific image is
+missing from `media/`, the asset may not be present in the export at all — check
+the log for `UNMATCHED`.
+
+**"Audio not playing."**
+Verify `.wav` files exist in the conversation's `media/` folder and that you're
+serving over `http://`.
+
+---
+
+## ⚙️ Performance
+
+Measured on a recent Mac, organized output with HTML:
+
+- **~2,000 conversations / ~6,000 media files**: ~30–60 s of processing after
+  extraction (a real 5 GB / 1,968-conversation export matched 5,936 media files
+  in ~32 s).
+- Processing is **I/O bound** — wall-clock is dominated by unzipping and copying
+  media, so it scales with disk speed.
+
+---
+
+## 🧱 Project structure
+
+```
+openai_export_parser/
+├── parser.py                       # Orchestrates extract → scan → match → write
+├── utils.py                        # Zip extraction, ditto fallback, type sniffing
+├── conversation_organizer.py       # Per-conversation folders + media copying
+├── html_generator.py               # HTML/CSS/JS for viewer and master index
+├── comprehensive_media_indexer.py  # Builds file indices
+├── comprehensive_media_matcher.py  # Multi-strategy media matching
+├── media_reference_extractor.py    # Pulls media references out of conversations
+└── claude_parser.py                # Converts Claude exports to the OpenAI shape
 ```
 
-## Understanding Export Formats
+---
 
-### OpenAI ChatGPT Exports
-
-OpenAI has changed export formats over time:
-
-**New Format (2024+)**
-- Multiple nested zips
-- Files in `file-service://` format
-- DALL-E metadata in separate fields
-- Voice transcripts in `audio_transcription` parts
-
-**Old Format (Pre-2024)**
-- Single `conversations.json` file
-- Flat media directory
-- Simple file naming
-- Limited metadata
-
-**This parser handles both OpenAI formats automatically** and can merge data from multiple exports.
-
-### Claude Conversation Exports
-
-Claude exports have a simpler structure:
-
-**Export Format**
-- Single zip file with 3 JSON files:
-  - `conversations.json` - All conversation data
-  - `projects.json` - Project knowledge bases
-  - `users.json` - User profile information
-- Flat message structure (no complex nesting)
-- File attachments referenced by filename
-- ISO 8601 timestamps
-
-**How to Export from Claude:**
-1. Go to Settings > Privacy (web app or Claude Desktop)
-2. Request data export
-3. Download the zip file from the email link (expires in 24 hours)
-
-**This parser automatically detects and converts Claude exports** to the same organized format as OpenAI exports.
-
-## Troubleshooting
-
-### "No conversations found"
-
-- Verify you're using the actual export.zip from OpenAI
-- Try verbose mode: `openai-export-parser export.zip -v`
-- Check the log for extraction errors
-
-### "Audio not playing in HTML"
-
-- Ensure conversation HTML files were regenerated with latest version
-- Check that WAV files exist in the `media/` folder
-- Verify browser supports HTML5 audio (all modern browsers do)
-
-### "Media files not matching"
-
-- Check the parse log for "UNMATCHED" warnings
-- Try incorporating old exports via `recovered_files/`
-- Some files may be missing from the export entirely
-- Review the generated `unmatched_media_*.csv` if available
-
-### "Bad magic number for file header"
-
-The parser handles corrupted zips automatically:
-- macOS: Uses `ditto` (same as Archive Utility)
-- Linux/Windows: Falls back to system `unzip`
-- Accepts partial extractions when possible
-
-If Archive Utility can open it, the parser will too.
-
-### "Encoding errors"
-
-```python
-parser = ExportParser(verbose=True)
-parser.parse_export("export.zip", "output")
-# Check console output for encoding warnings
-```
-
-The parser uses UTF-8 with error handling - most encoding issues are automatically resolved.
-
-## Development
-
-### Running Tests
+## 👩‍💻 Development
 
 ```bash
 pip install -e ".[dev]"
 pytest tests/
 ```
 
-### Project Structure
-
-```
-openai_export_parser/
-├── parser.py                    # Main entry point
-├── conversation_organizer.py    # Folder creation and organization
-├── html_generator.py            # HTML/CSS/JavaScript generation
-├── comprehensive_media_indexer.py   # File indexing
-├── comprehensive_media_matcher.py   # 7-strategy matching
-└── media_reference_extractor.py     # Extract media references
-```
-
-### Adding New Features
-
-1. **New media type support** - Update `html_generator.py` rendering logic
-2. **New matching strategy** - Add to `comprehensive_media_matcher.py`
-3. **New export format** - Enhance `schema_inference.py`
-
-## Performance
-
-Typical performance on a modern system:
-
-- **Small export** (100 conversations, 500 files): ~30 seconds
-- **Medium export** (1,000 conversations, 3,000 files): ~3 minutes
-- **Large export** (2,000+ conversations, 6,000+ files): ~8 minutes
-
-The parser is I/O bound - performance scales with disk speed.
-
-## Contributing
-
-Contributions welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Run tests (`pytest tests/`)
-4. Commit changes (`git commit -m 'Add amazing feature'`)
-5. Push to branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Related Projects
-
-- [Humanizer](https://github.com/temnoon/humanizer_root) - Quantum memory system using tetralemma logic
-- [Humanizer MCP Server](https://github.com/temnoon/humanizer-mcp) - Memory server integration
-
-## Acknowledgments
-
-- Built for the [Humanizer](https://github.com/temnoon/humanizer_root) project
-- Inspired by the need for comprehensive ChatGPT archive preservation
-- Thanks to the community for testing and feedback
+Where to make changes:
+- **New media type** → rendering in `html_generator.py`, and `sniff_extension()`
+  in `utils.py` if the type needs extension recovery.
+- **New matching strategy** → `comprehensive_media_matcher.py` (+ an index in
+  `comprehensive_media_indexer.py`).
+- **New export layout** → extraction/scan in `parser.py` and `utils.py`.
 
 ---
 
-**Found a bug?** [Open an issue](https://github.com/temnoon/openai-export-parser/issues)
+## 🤝 Contributing
 
-**Have a question?** [Start a discussion](https://github.com/temnoon/openai-export-parser/discussions)
+1. Fork and branch (`git checkout -b feature/your-feature`).
+2. `pytest tests/`.
+3. Open a pull request describing the export format or scenario you're improving —
+   sample (anonymized) export structures are especially welcome, since the format
+   keeps changing.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Related projects
+
+- [Humanizer](https://github.com/temnoon/humanizer_root) — local-first archive &
+  knowledge tooling this parser feeds into.
+
+---
+
+**Found a bug or a new export format?** [Open an issue](https://github.com/temnoon/openai_export_parser/issues).
