@@ -6,7 +6,6 @@ from openai_export_parser.utils import (
     timestamp_to_iso,
 )
 
-
 # --- sniff_extension: recover real type for ".dat" / extension-less assets ----
 
 # (magic-byte prefix, expected extension)

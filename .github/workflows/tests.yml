@@ -41,7 +41,9 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v6
       with:
-        python-version: '3.11'
+        # Match black's highest target-version (py312) so its AST safety check
+        # validates the formatted output deterministically.
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
