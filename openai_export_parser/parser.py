@@ -299,33 +299,74 @@ class ExportParser:
 
     def _write_viewer_launcher(self, out_dir):
         """
-        Write a double-clickable `view.command` (macOS) into the output folder
-        that serves the archive over http:// and opens the master index.
+        Write cross-platform viewer launchers into the output folder so the
+        archive can be browsed over http:// (which avoids the file:// browser
+        restrictions that break cross-folder links and block local images):
 
-        Viewing the output directly from disk (file://) breaks cross-folder
-        links and blocks local images; a local web server avoids both.
+          - view.py       cross-platform; run ``python view.py`` anywhere
+          - view.command  macOS double-click wrapper
+          - view.bat      Windows double-click wrapper
         """
-        launcher = (
-            "#!/bin/bash\n"
-            "# Double-click this file to browse the export.\n"
-            "# It starts a tiny local web server in this folder and opens the\n"
-            "# index. Browsing over http:// avoids the file:// restrictions that\n"
-            "# break conversation links and media in most browsers.\n"
-            'cd "$(dirname "$0")" || exit 1\n'
-            "PORT=8770\n"
-            'while lsof -i :"$PORT" >/dev/null 2>&1; do PORT=$((PORT+1)); done\n'
-            'echo "Serving this export at http://localhost:$PORT/"\n'
-            'echo "Close this window (or press Ctrl-C) to stop the server."\n'
-            '( sleep 1; open "http://localhost:$PORT/index.html" ) &\n'
-            'exec python3 -m http.server "$PORT"\n'
+        # The real launcher: pure-stdlib, works on macOS, Windows and Linux.
+        view_py = (
+            '"""Serve this exported archive locally and open it in a browser.\n'
+            "\n"
+            "Double-click view.command (macOS) / view.bat (Windows), or run\n"
+            "    python view.py\n"
+            "Browsing over http:// avoids the file:// restrictions that break\n"
+            "conversation links and images in most browsers.\n"
+            '"""\n'
+            "import http.server\n"
+            "import os\n"
+            "import socketserver\n"
+            "import webbrowser\n"
+            "\n"
+            "os.chdir(os.path.dirname(os.path.abspath(__file__)))\n"
+            "\n"
+            "Handler = http.server.SimpleHTTPRequestHandler\n"
+            'with socketserver.TCPServer(("127.0.0.1", 0), Handler) as httpd:\n'
+            "    port = httpd.server_address[1]\n"
+            '    url = f"http://localhost:{port}/index.html"\n'
+            '    print(f"Serving this export at {url}")\n'
+            '    print("Close this window (or press Ctrl-C) to stop the server.")\n'
+            "    webbrowser.open(url)\n"
+            "    try:\n"
+            "        httpd.serve_forever()\n"
+            "    except KeyboardInterrupt:\n"
+            "        pass\n"
         )
-        launcher_path = os.path.join(out_dir, "view.command")
-        try:
-            with open(launcher_path, "w", encoding="utf-8") as f:
-                f.write(launcher)
-            os.chmod(launcher_path, 0o755)
-        except OSError as e:
-            self.log(f"Could not write viewer launcher: {e}")
+
+        # macOS double-click wrapper.
+        view_command = (
+            "#!/bin/bash\n"
+            "# Double-click to browse this export (starts a local web server).\n"
+            'cd "$(dirname "$0")" || exit 1\n'
+            "exec python3 view.py\n"
+        )
+
+        # Windows double-click wrapper.
+        view_bat = (
+            "@echo off\r\n"
+            "rem Double-click to browse this export (starts a local web server).\r\n"
+            'cd /d "%~dp0"\r\n'
+            "python view.py || py view.py\r\n"
+            "pause\r\n"
+        )
+
+        files = [
+            ("view.py", view_py, 0o755),
+            ("view.command", view_command, 0o755),
+            ("view.bat", view_bat, None),
+        ]
+        for name, content, mode in files:
+            path = os.path.join(out_dir, name)
+            try:
+                with open(path, "w", encoding="utf-8", newline="") as f:
+                    f.write(content)
+                if mode is not None:
+                    os.chmod(path, mode)
+            except OSError as e:
+                self.log(f"Could not write {name}: {e}")
 
     def _write_flat_output(self, conversations, schemas, out_dir):
         """

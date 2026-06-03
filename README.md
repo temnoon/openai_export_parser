@@ -37,12 +37,14 @@ Claude — is detected automatically.)
 
 **3. Read your archive**
 
-Open the output folder and double-click **`view.command`** (macOS). It starts a
-tiny local web server and opens the master index in your browser.
+Open the output folder and double-click the viewer launcher —
+**`view.command`** on macOS, **`view.bat`** on Windows (or run `python view.py`
+anywhere). It starts a tiny local web server and opens the master index in your
+browser.
 
 > **Why not just double-click `index.html`?** Browsers sandbox pages opened as
 > `file://`, which breaks links between conversations and stops images from
-> loading. Viewing over a local `http://` server (what `view.command` does) makes
+> loading. Viewing over a local `http://` server (what the launcher does) makes
 > everything work. See [Viewing your archive](#-viewing-your-archive).
 
 That's it. You now have every conversation as its own folder plus a searchable
@@ -145,17 +147,23 @@ parser.parse_export("export.zip", "output_dir")
 
 The output is **static files**, but browsers restrict pages opened directly from
 disk (`file://`): cross-folder links and local images silently fail. Serve the
-folder over `http://` instead — any of these work:
+folder over `http://` instead. Every output folder ships with a launcher that
+does this for you:
 
-**Easiest (macOS):** double-click **`view.command`** in the output folder. It
-finds a free port, starts a local server, and opens the index for you. Close the
-Terminal window to stop it.
+| Platform | Just double-click |
+|----------|-------------------|
+| **macOS** | `view.command` |
+| **Windows** | `view.bat` |
+| **Any OS** | run `python view.py` in the folder |
 
-**Manual (any OS):**
+Each finds a free port, starts a local server, opens the index in your browser,
+and keeps running until you close its window (or press Ctrl-C).
+
+**Or fully manual (any OS):**
 
 ```bash
 cd your-output-folder
-python3 -m http.server 8000
+python -m http.server 8000     # use python3 on macOS/Linux
 # then open http://localhost:8000/index.html
 ```
 
@@ -171,7 +179,7 @@ players, highlighted code, and rendered math.
 my-chatgpt-archive/
 ├── index.html                     # Master index — start here (serve over http://)
 ├── index.json                     # Archive metadata + stats
-├── view.command                   # Double-click to launch the local viewer (macOS)
+├── view.command / view.bat / view.py   # Double-click (mac/Windows) or `python view.py`
 ├── _with_media/                   # Shortcuts to conversations that have media
 ├── _with_assets/                  # Shortcuts to conversations with code/canvas assets
 ├── 2023-10-04_Cosmic_Surreal_Art_Creation_01397/
@@ -184,9 +192,8 @@ my-chatgpt-archive/
 └── … one folder per conversation
 ```
 
-> Note: `view.command` is written into the output folder by the bundled viewer
-> helper; if your output predates it, just use the manual `http.server` command
-> above.
+> Note: the `view.*` launchers are written into the output folder automatically;
+> if your output predates them, just use the manual `http.server` command above.
 
 ---
 
@@ -227,14 +234,21 @@ boundary**, with members stored using data descriptors. The practical result:
   the 4 GiB mark (`bad zipfile offset` / `Truncated file header`).
 - Only **streaming extractors** that read members sequentially can open them.
 
-So on macOS the parser sends any archive larger than 4 GiB straight to
-**`ditto`** (the same engine as Finder's Archive Utility), which extracts these
-archives correctly. Smaller and well-formed zips use the fast Python path. If a
-zip is merely corrupted, the parser still falls back through `ditto` → system
-`unzip`, accepting partial extractions when possible.
+The parser handles this automatically on **every OS**:
+
+1. Well-formed/smaller zips use Python's fast `zipfile` path.
+2. On macOS, giant archives go to **`ditto`** (Finder's Archive Utility engine).
+3. Everywhere else (Windows, Linux, or if `ditto` is unavailable), a **built-in
+   pure-Python streaming extractor** kicks in. It ignores the wrapped offsets,
+   reads each member's real name and size from the intact central directory, and
+   walks the local file headers sequentially — recovering the archive with no
+   external tools. (Verified end-to-end on a real 5 GB export.)
+
+So **a multi-gigabyte export now extracts directly on Windows too** — no manual
+pre-extraction step required.
 
 **Rule of thumb:** if Finder's Archive Utility can open your export, this parser
-can too.
+can too — and on Windows it doesn't even need that.
 
 ---
 
@@ -262,14 +276,16 @@ The matcher tries several approaches, most reliable first, and de-duplicates hit
 
 **"`index.html` doesn't work / looks blank / links are dead."**
 You're opening it as `file://`. Serve the folder over `http://` instead — use
-`view.command` or `python3 -m http.server` (see
+the `view.*` launcher or `python -m http.server` (see
 [Viewing your archive](#-viewing-your-archive)).
 
 **"Bad magic number" / "Truncated file header" / extraction fails on a big zip.**
-That's the >4 GiB ZIP64 wrap issue above. On macOS the parser uses `ditto`
-automatically. If you're on Linux/Windows with a giant export, first extract the
-**outer** zip with a streaming tool (e.g. macOS Archive Utility, `7z`, or The
-Unarchiver) and run the parser against the extracted folder.
+That's the >4 GiB ZIP64 wrap issue described in
+[How it handles giant exports](#-how-it-handles-giant-exports). The parser
+recovers these automatically on every OS (macOS `ditto` or the built-in
+pure-Python extractor). If it still fails, the archive may be genuinely
+corrupted — try extracting the **outer** zip with Windows Explorer / `7z` / The
+Unarchiver and running the parser against the extracted folder.
 
 **"No conversations found."**
 Confirm you passed the real export `.zip` (or its extracted folder). Re-run with

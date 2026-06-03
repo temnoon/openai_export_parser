@@ -2,6 +2,8 @@ import os
 import zipfile
 import uuid
 import shutil
+import struct
+import zlib
 
 
 def ensure_dir(path):
@@ -12,33 +14,52 @@ def ensure_dir(path):
 # 4 GiB. OpenAI's 2025+ multi-GB exports are written as non-ZIP64 archives
 # whose central-directory offsets wrap at this boundary and whose members use
 # data descriptors. Python's zipfile (and Info-ZIP unzip / bsdtar) cannot read
-# members past this point — only streaming extractors (macOS ditto / Archive
-# Utility) succeed. For such archives we skip straight to ditto on macOS.
+# members past this point. We recover these with macOS `ditto` when available,
+# and otherwise with a pure-Python streaming extractor (works on every OS).
 _ZIP64_WRAP_THRESHOLD = 4 * 1024**3
+
+_LFH_SIG = b"PK\x03\x04"  # local file header
+_CFH_SIG = b"PK\x01\x02"  # central directory file header
+_EOCD_SIG = b"PK\x05\x06"  # end of central directory
 
 
 def unzip(src, dst):
     """
-    Extract zip archive to destination directory.
-    Falls back to system unzip command if Python zipfile fails.
-    Handles corrupted/malformed zips that macOS can still open.
+    Extract a zip archive to ``dst``, recovering from the malformed multi-GB
+    archives that recent OpenAI exports ship.
+
+    Strategy, in order:
+      1. Python's ``zipfile`` — fast path for normal/well-formed archives
+         (skipped for >4 GiB archives, which are the known-broken kind).
+      2. macOS ``ditto`` — streams members correctly (Archive Utility's engine).
+      3. Pure-Python streaming extractor — cross-platform recovery that walks
+         local file headers and reads member sizes from the (intact) central
+         directory, so it works on Windows and Linux with no external tools.
+      4. System ``unzip`` — last resort if present.
     """
     import sys
+    import subprocess
 
     ensure_dir(dst)
 
-    # Large OpenAI exports (>4 GiB) are broken non-ZIP64 archives that Python's
-    # zipfile only partially extracts before raising. On macOS, go straight to
-    # ditto (the same engine as Finder's Archive Utility), which streams members
-    # via their local headers and handles these archives correctly.
     try:
         too_big = os.path.getsize(src) > _ZIP64_WRAP_THRESHOLD
     except OSError:
         too_big = False
 
-    if too_big and sys.platform == "darwin":
-        import subprocess
+    # 1. Fast path: Python zipfile for normal archives. The broken >4 GiB
+    #    exports only partially extract before raising, so skip straight to the
+    #    recovery extractors for them.
+    if not too_big:
+        try:
+            with zipfile.ZipFile(src, "r") as z:
+                z.extractall(dst)
+            return
+        except (zipfile.BadZipFile, OSError):
+            pass
 
+    # 2. macOS ditto — handles both giant and corrupted archives natively.
+    if sys.platform == "darwin":
         try:
             subprocess.run(
                 ["ditto", "-x", "-k", src, dst],
@@ -48,68 +69,225 @@ def unzip(src, dst):
             )
             return
         except (subprocess.CalledProcessError, FileNotFoundError):
-            pass  # Fall through to the normal Python-first path
+            pass
 
-    # Try Python's zipfile first
+    # 3. Pure-Python streaming extractor (cross-platform, no external tools).
     try:
-        with zipfile.ZipFile(src, "r") as z:
-            z.extractall(dst)
+        if _stream_extract(src, dst) > 0:
+            return
+    except Exception:
+        pass
+
+    # 4. Last resort: system unzip, if available.
+    try:
+        result = subprocess.run(
+            ["unzip", "-q", "-o", src, "-d", dst], capture_output=True, text=True
+        )
+        if os.path.exists(dst) and os.listdir(dst):
+            return
+        raise RuntimeError(
+            f"Failed to extract {src} (unzip exit {result.returncode}): "
+            f"{result.stderr.strip()}"
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"Failed to extract {src}. Python's zipfile and the built-in "
+            f"streaming extractor could not read it, and no 'unzip' command is "
+            f"available. On Windows, extract the .zip with File Explorer "
+            f"(right-click -> Extract All) and run the parser against the "
+            f"resulting folder instead of the .zip."
+        )
+
+
+def _stream_extract(src, dst):
+    """
+    Recover a malformed (non-ZIP64-wrapped) zip by streaming it.
+
+    Recent OpenAI exports exceed 4 GiB but are written as non-ZIP64 archives:
+    the central-directory *offsets* have wrapped at 2**32 and members use data
+    descriptors, so offset-based tools fail. The member *names* and *sizes* in
+    the central directory are still intact, and members are laid out
+    sequentially. So we read the central directory for sizes, then walk the
+    local file headers from the start of the file, copying/inflating each
+    member by its known size. Handles stored (0) and deflated (8) members.
+
+    Returns the number of members extracted.
+    """
+    file_size = os.path.getsize(src)
+    with open(src, "rb") as f:
+        sizes = _central_directory_sizes(f, file_size)
+        if not sizes:
+            raise ValueError("could not read central directory")
+
+        pos = _find_first_local_header(f)
+        count = 0
+        while pos is not None and pos < file_size:
+            f.seek(pos)
+            hdr = f.read(30)
+            if hdr[:4] != _LFH_SIG:
+                break  # reached the central directory / end of members
+
+            flags = struct.unpack("<H", hdr[6:8])[0]
+            local_method = struct.unpack("<H", hdr[8:10])[0]
+            local_comp = struct.unpack("<I", hdr[18:22])[0]
+            nlen = struct.unpack("<H", hdr[26:28])[0]
+            elen = struct.unpack("<H", hdr[28:30])[0]
+            name = f.read(nlen).decode("utf-8", "replace")
+            f.seek(elen, os.SEEK_CUR)  # skip extra field
+            data_start = pos + 30 + nlen + elen
+
+            cd = sizes.get(name)
+            method = cd[0] if cd else local_method
+            # Prefer the central-directory size; local headers are 0 when a
+            # data descriptor is used (flag bit 3).
+            if cd and cd[1] is not None:
+                comp_size = cd[1]
+            elif not (flags & 0x08):
+                comp_size = local_comp
+            else:
+                raise ValueError(f"unknown size for member {name!r}")
+
+            _write_member(f, data_start, comp_size, method, dst, name)
+            count += 1
+
+            # Advance past the data (and any data descriptor) to the next record.
+            pos = _find_next_record(f, data_start + comp_size)
+
+        if count == 0:
+            raise ValueError("no members extracted")
+        return count
+
+
+def _find_first_local_header(f):
+    """Return the offset of the first local file header (usually 0)."""
+    f.seek(0)
+    if f.read(4) == _LFH_SIG:
+        return 0
+    f.seek(0)
+    window = f.read(1024 * 1024)
+    i = window.find(_LFH_SIG)
+    return i if i >= 0 else None
+
+
+def _find_next_record(f, from_pos):
+    """
+    Find the next local-file-header or central-directory signature at/after
+    ``from_pos``, skipping an optional data descriptor (<= 24 bytes).
+    """
+    f.seek(from_pos)
+    window = f.read(64)
+    for sig in (_LFH_SIG, _CFH_SIG):
+        i = window.find(sig)
+        if i >= 0:
+            if sig == _CFH_SIG:
+                return None  # central directory reached; stop
+            return from_pos + i
+    return None
+
+
+def _write_member(f, data_start, comp_size, method, dst, name):
+    """Write a single member to ``dst/name``, inflating if deflated."""
+    # Normalize and guard against path traversal in member names.
+    out_path = os.path.normpath(os.path.join(dst, name))
+    if not out_path.startswith(
+        os.path.abspath(dst) + os.sep
+    ) and out_path != os.path.abspath(dst):
+        out_path = os.path.normpath(os.path.join(dst, os.path.basename(name)))
+
+    if name.endswith("/"):
+        ensure_dir(out_path)
         return
-    except (zipfile.BadZipFile, OSError) as e:
-        # Python zipfile failed, try system extraction tools
-        import subprocess
-        import sys
 
-        # On macOS, try ditto first (same tool Archive Utility uses)
-        if sys.platform == "darwin":
-            try:
-                subprocess.run(
-                    ["ditto", "-x", "-k", src, dst],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                return
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass  # Fall through to unzip
+    ensure_dir(os.path.dirname(out_path))
+    f.seek(data_start)
+    remaining = comp_size
 
-        # Try system unzip command
-        try:
-            result = subprocess.run(
-                ["unzip", "-q", "-o", src, "-d", dst], capture_output=True, text=True
-            )
+    if method == 0:  # stored
+        with open(out_path, "wb") as out:
+            while remaining > 0:
+                chunk = f.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                out.write(chunk)
+                remaining -= len(chunk)
+    elif method == 8:  # deflate
+        decompressor = zlib.decompressobj(-15)
+        with open(out_path, "wb") as out:
+            while remaining > 0:
+                chunk = f.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    break
+                out.write(decompressor.decompress(chunk))
+                remaining -= len(chunk)
+            out.write(decompressor.flush())
+    else:
+        raise ValueError(f"unsupported compression method {method} for {name!r}")
 
-            # Check if files were actually extracted (even with warnings)
-            extracted_files = os.listdir(dst) if os.path.exists(dst) else []
 
-            if extracted_files:
-                # Success! Files were extracted despite warnings
-                return
+def _central_directory_sizes(f, file_size):
+    """
+    Return ``{name: (method, compressed_size)}`` from the central directory.
 
-            # No files extracted
-            if result.returncode != 0:
-                raise subprocess.CalledProcessError(
-                    result.returncode, result.args, result.stdout, result.stderr
-                )
+    The central directory sits just before the end-of-central-directory record;
+    its recorded *offset* may have wrapped, but its *size* has not, so we locate
+    it as ``eocd_position - cd_size`` rather than trusting the stored offset.
+    """
+    read_len = min(file_size, 65536 + 22)
+    f.seek(file_size - read_len)
+    tail = f.read(read_len)
+    i = tail.rfind(_EOCD_SIG)
+    if i < 0:
+        return {}
 
-        except subprocess.CalledProcessError as cmd_error:
-            # Check one more time if files were extracted
-            extracted_files = os.listdir(dst) if os.path.exists(dst) else []
-            if extracted_files:
-                # Files were extracted, ignore the error
-                return
+    eocd = tail[i : i + 22]
+    cd_size = struct.unpack("<I", eocd[12:16])[0]
+    eocd_pos = (file_size - read_len) + i
+    cd_start = eocd_pos - cd_size
+    if cd_start < 0 or cd_size == 0 or cd_size == 0xFFFFFFFF:
+        return {}
 
-            # Truly failed
-            raise RuntimeError(
-                f"Failed to extract {src}:\n"
-                f"  Python zipfile error: {e}\n"
-                f"  System unzip error: {cmd_error.stderr}"
-            )
-        except FileNotFoundError:
-            raise RuntimeError(
-                f"Failed to extract {src} with Python zipfile: {e}\n"
-                f"System 'unzip' command not found. Please install it or fix the zip file."
-            )
+    f.seek(cd_start)
+    data = f.read(cd_size)
+    return _parse_central_directory(data)
+
+
+def _parse_central_directory(data):
+    """Parse central-directory bytes into ``{name: (method, compressed_size)}``."""
+    sizes = {}
+    p = 0
+    n = len(data)
+    while p + 46 <= n and data[p : p + 4] == _CFH_SIG:
+        method = struct.unpack("<H", data[p + 10 : p + 12])[0]
+        comp = struct.unpack("<I", data[p + 20 : p + 24])[0]
+        uncomp = struct.unpack("<I", data[p + 24 : p + 28])[0]
+        nlen = struct.unpack("<H", data[p + 28 : p + 30])[0]
+        elen = struct.unpack("<H", data[p + 30 : p + 32])[0]
+        clen = struct.unpack("<H", data[p + 32 : p + 34])[0]
+        name = data[p + 46 : p + 46 + nlen].decode("utf-8", "replace")
+        extra = data[p + 46 + nlen : p + 46 + nlen + elen]
+
+        if comp == 0xFFFFFFFF:  # true ZIP64 member; read size from extra field
+            comp = _zip64_compressed_size(extra, uncomp_is_ff=(uncomp == 0xFFFFFFFF))
+
+        sizes[name] = (method, comp)
+        p += 46 + nlen + elen + clen
+    return sizes
+
+
+def _zip64_compressed_size(extra, uncomp_is_ff):
+    """Pull the 8-byte compressed size out of a ZIP64 extended-info extra field."""
+    p = 0
+    while p + 4 <= len(extra):
+        header_id, size = struct.unpack("<HH", extra[p : p + 4])
+        body = extra[p + 4 : p + 4 + size]
+        if header_id == 0x0001:
+            # Order: [uncompressed][compressed][...], only for fields that were
+            # 0xFFFFFFFF. Uncompressed comes first when it was also 0xFFFFFFFF.
+            idx = 8 if uncomp_is_ff else 0
+            if len(body) >= idx + 8:
+                return struct.unpack("<Q", body[idx : idx + 8])[0]
+        p += 4 + size
+    return None
 
 
 def is_zip(path):

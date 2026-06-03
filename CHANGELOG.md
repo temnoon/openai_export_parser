@@ -12,11 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Magic-byte file-type sniffing (`utils.sniff_extension`) to recover real
   extensions for assets stored with a generic `.dat` extension, so images and
   audio render in the HTML viewer
-- A double-clickable `view.command` launcher is written into each organized
-  output folder; it serves the archive over http:// and opens the index,
-  avoiding the file:// browser restrictions that break links and images
+- Cross-platform recovery for giant (>4 GiB) broken exports: a built-in
+  pure-Python streaming extractor (`utils._stream_extract`) reads member sizes
+  from the intact central directory and walks the local file headers, so
+  Windows and Linux extract these archives natively without `ditto` (verified
+  on a real 5 GB export). No manual pre-extraction step needed anymore.
+- Cross-platform viewer launchers in every output folder: `view.py` (any OS),
+  `view.command` (macOS double-click), and `view.bat` (Windows double-click).
+  Each serves the archive over http:// and opens the index, avoiding the
+  file:// browser restrictions that break links and images.
 - Rewritten README with a new-user onboarding guide, format-support matrix,
-  giant-zip handling notes, and a viewing/troubleshooting section
+  giant-zip handling notes, and a cross-platform viewing/troubleshooting section
 
 ### Changed
 - `utils.unzip` now routes archives larger than 4 GiB straight to `ditto` on
