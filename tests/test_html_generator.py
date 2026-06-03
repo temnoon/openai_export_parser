@@ -84,3 +84,7 @@ def test_footer_attribution_points_to_real_repo(generator):
 
     assert "github.com/temnoon/openai_export_parser" in html
     assert "anthropics/openai-export-parser" not in html
+
+def test_viewer_backfills_children_from_parent(generator):
+    html = generator.generate_conversation_html(conversation=_minimal_conversation())
+    assert "backfill-children" in html  # parent-only exports must still render

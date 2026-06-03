@@ -148,6 +148,20 @@ class HTMLGenerator:
     <script>
         // Load JSON data from script tags
         const conversationData = JSON.parse(document.getElementById('conversation-data').textContent);
+        /* backfill-children */
+        if (conversationData && conversationData.mapping) {{
+            const _m = conversationData.mapping;
+            const _has = Object.values(_m).some(n => n.children && n.children.length);
+            if (!_has) {{
+                Object.values(_m).forEach(n => {{ n.children = []; }});
+                Object.keys(_m).forEach(id => {{
+                    const pid = _m[id].parent;
+                    if (pid && _m[pid]) _m[pid].children.push(id);
+                }});
+                const t = id => (_m[id].message && _m[id].message.create_time) || 0;
+                Object.keys(_m).forEach(id => _m[id].children.sort((a,b) => t(a)-t(b)));
+            }}
+        }}
         const mediaFiles = JSON.parse(document.getElementById('media-files-data').textContent);
         const assetFiles = JSON.parse(document.getElementById('asset-files-data').textContent);
         const mediaMapping = JSON.parse(document.getElementById('media-mapping-data').textContent);
