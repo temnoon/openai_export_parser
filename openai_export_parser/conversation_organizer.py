@@ -86,8 +86,13 @@ class ConversationOrganizer:
         title = conversation.get("title", "untitled")
         title_safe = sanitize_filename(title, max_length=50)
 
-        # Generate folder name
-        folder_name = f"{timestamp}_{title_safe}_{conv_index:05d}"
+        # Use the conversation's stable id so folder names are deterministic
+        # across runs (the positional index is not). Fall back to the index
+        # only when the conversation has no id.
+        conv_id = conversation.get("conversation_id") or conversation.get("id")
+        suffix = sanitize_filename(str(conv_id), max_length=40) if conv_id else f"{conv_index:05d}"
+        folder_name = f"{timestamp}_{title_safe}_{suffix}"
+        return folder_name
 
         return folder_name
 

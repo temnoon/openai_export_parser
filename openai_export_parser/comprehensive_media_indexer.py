@@ -228,6 +228,9 @@ class ComprehensiveMediaIndexer:
         Returns:
             conversation_id or None
         """
+        # os.walk yields backslash separators on Windows; normalize so the
+        # forward-slash patterns below match on every platform.
+        filepath = filepath.replace("\\", "/")
         # Standard UUID: 8-4-4-4-12
         match = re.search(
             r"/conversations/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/",

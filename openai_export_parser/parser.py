@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 from tqdm import tqdm
 from dateutil.parser import parse as parse_dt
 
@@ -85,57 +86,62 @@ class ExportParser:
         tmp_dir = os.path.join(output_dir, "_tmp")
         ensure_dir(tmp_dir)
 
-        self.log("Unzipping top-level archive...")
-        unzip(zip_path, tmp_dir)
+        try:
+            self.log("Unzipping top-level archive...")
+            unzip(zip_path, tmp_dir)
 
-        self.log("Scanning for conversations and media...")
-        self.scan(tmp_dir)
+            self.log("Scanning for conversations and media...")
+            self.scan(tmp_dir)
 
-        self.log(f"Found {len(self.conversation_files)} conversation files")
-        self.log(f"Found {len(self.media_files)} media files")
+            self.log(f"Found {len(self.conversation_files)} conversation files")
+            self.log(f"Found {len(self.media_files)} media files")
 
-        conversations = self.load_conversations()
-        conversations = self.normalize_conversations(conversations)
+            conversations = self.load_conversations()
+            conversations = self.normalize_conversations(conversations)
 
-        # Build comprehensive media index from directory structure
-        self.log("Building comprehensive media index...")
+            # Build comprehensive media index from directory structure
+            self.log("Building comprehensive media index...")
 
-        # Optional recovery folder for media salvaged from older exports.
-        # Defaults to a "recovered_files/" directory at the project root; if it
-        # doesn't exist the indexer simply skips it.
-        recovery_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "recovered_files"
-        )
+            # Optional recovery folder for media salvaged from older exports.
+            # Defaults to a "recovered_files/" directory at the project root; if it
+            # doesn't exist the indexer simply skips it.
+            recovery_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "recovered_files"
+            )
 
-        file_indices = self.indexer.build_index(tmp_dir, recovery_dir=recovery_dir)
+            file_indices = self.indexer.build_index(tmp_dir, recovery_dir=recovery_dir)
 
-        # Log index stats
-        index_stats = self.indexer.get_stats()
-        self.log(f"✓ Indexed {index_stats['total_files']} total media files")
-        self.log(f"  - Files with file-ID prefixes: {index_stats['file_id_files']}")
-        self.log(
-            f"  - Files with file_{{hash}}-{{uuid}} pattern: {index_stats['file_hash_files']}"
-        )
-        self.log(
-            f"  - Files in conversation directories: {index_stats['conversation_dirs']}"
-        )
-        self.log(
-            f"  - Unique (filename, size) pairs: {index_stats['unique_basename_size_pairs']}"
-        )
+            # Log index stats
+            index_stats = self.indexer.get_stats()
+            self.log(f"✓ Indexed {index_stats['total_files']} total media files")
+            self.log(f"  - Files with file-ID prefixes: {index_stats['file_id_files']}")
+            self.log(
+                f"  - Files with file_{{hash}}-{{uuid}} pattern: {index_stats['file_hash_files']}"
+            )
+            self.log(
+                f"  - Files in conversation directories: {index_stats['conversation_dirs']}"
+            )
+            self.log(
+                f"  - Unique (filename, size) pairs: {index_stats['unique_basename_size_pairs']}"
+            )
 
-        self.log("Matching media to conversations...")
-        conversations = self.matcher.match(conversations, file_indices, self.extractor)
+            self.log("Matching media to conversations...")
+            conversations = self.matcher.match(conversations, file_indices, self.extractor)
 
-        # Log matching stats
-        self.matcher.print_summary()
+            # Log matching stats
+            self.matcher.print_summary()
 
-        self.log("Inferring schemas...")
-        schemas = self.infer.infer_global_schema(conversations)
+            self.log("Inferring schemas...")
+            schemas = self.infer.infer_global_schema(conversations)
 
-        self.log("Writing output...")
-        self.write_output(conversations, schemas, output_dir)
+            self.log("Writing output...")
+            self.write_output(conversations, schemas, output_dir)
 
-        self.log("✅ Parsing complete")
+            self.log("✅ Parsing complete")
+        finally:
+            # Remove the temporary extraction tree; it can be as large as the
+            # original archive and is not part of the output.
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # ----------------------------------------
     # Recursive scan for conversations and media
@@ -155,9 +161,10 @@ class ExportParser:
             for f in files:
                 full = os.path.join(dirpath, f)
                 ext = os.path.splitext(f)[1].lower()
-
-                # Handle nested zip archives
-                if is_zip(full):
+                # Handle nested zip archives (only probe files that claim to be
+                # zips — avoids opening/reading every media file, and stops a
+                # media file with coincidental zip magic from being mis-extracted)
+                if ext == ".zip" and is_zip(full):
                     self.log(f"Extracting nested zip: {f}")
                     out = full + "_unzipped"
                     unzip(full, out)
