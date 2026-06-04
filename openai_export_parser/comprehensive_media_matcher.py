@@ -56,7 +56,10 @@ class ComprehensiveMediaMatcher:
             reference_extractor: MediaReferenceExtractor instance
 
         Returns:
-            Updated conversations with matched media files
+            Updated conversations with matched media files. Each conversation
+            also gets a ``_media_matches`` dict mapping filepath -> the strategy
+            that matched it, so a low-confidence (e.g. size-ambiguous) match is
+            distinguishable from a hash-certain one.
         """
         self.log("Matching media using comprehensive multi-strategy approach...")
 
@@ -66,8 +69,9 @@ class ComprehensiveMediaMatcher:
             # Extract all media references from this conversation
             references = reference_extractor.extract_all_references(conv)
 
-            # Collect matched files
+            # Collect matched files and record which strategy matched each one.
             matched_files = set()
+            match_strategy = {}
 
             # Strategy 1: Match by file hash (sediment://)
             file_hashes = reference_extractor.get_all_file_hashes(references)
@@ -75,6 +79,7 @@ class ComprehensiveMediaMatcher:
                 filepath = file_indices["file_hash_to_path"].get(file_hash)
                 if filepath:
                     matched_files.add(filepath)
+                    match_strategy[filepath] = "by_file_hash"
                     self.stats["by_file_hash"] += 1
                     self.log(f"    Matched by file_hash: {file_hash}")
                 else:
@@ -87,6 +92,7 @@ class ComprehensiveMediaMatcher:
                 filepath = file_indices["file_id_to_path"].get(file_id)
                 if filepath and filepath not in matched_files:
                     matched_files.add(filepath)
+                    match_strategy[filepath] = "by_file_id"
                     self.stats["by_file_id"] += 1
                     self.log(f"    Matched by file_id: {file_id}")
 
@@ -100,6 +106,7 @@ class ComprehensiveMediaMatcher:
                     )
                     if filepath and filepath not in matched_files:
                         matched_files.add(filepath)
+                        match_strategy[filepath] = "by_filename_size"
                         self.stats["by_filename_size"] += 1
                         self.log(
                             f"    Matched by filename+size: {filename} ({size} bytes)"
@@ -112,6 +119,7 @@ class ComprehensiveMediaMatcher:
                 for filepath in conv_files:
                     if filepath not in matched_files:
                         matched_files.add(filepath)
+                        match_strategy[filepath] = "by_conversation_dir"
                         self.stats["by_conversation_dir"] += 1
                         self.log(
                             f"    Matched by conversation_dir: {os.path.basename(filepath)}"
@@ -121,31 +129,54 @@ class ComprehensiveMediaMatcher:
             for dalle_gen in references.get("dalle_generations", []):
                 size_bytes = dalle_gen.get("size_bytes")
                 gen_id = dalle_gen.get("gen_id")
-                width = dalle_gen.get("width")
-                height = dalle_gen.get("height")
 
-                if size_bytes:
-                    candidate_files = file_indices["size_to_paths"].get(size_bytes, [])
+                if not size_bytes:
+                    continue
 
-                    # If we have only one file with this size, it's likely a match
-                    if len(candidate_files) == 1:
-                        filepath = candidate_files[0]
-                        if filepath not in matched_files:
-                            matched_files.add(filepath)
-                            self.stats["by_size_metadata"] += 1
-                            self.log(
-                                f"    Matched by size (unique): {size_bytes} bytes"
-                            )
+                # Confidence depends on how many files share this size in the
+                # whole archive, NOT on how many remain unclaimed. Otherwise the
+                # last unclaimed file of an ambiguous group would be mislabeled
+                # as a confident unique-size match.
+                same_size = file_indices["size_to_paths"].get(size_bytes, [])
+                unclaimed = [fp for fp in same_size if fp not in matched_files]
+                if not unclaimed:
+                    continue
 
-                    # If multiple files have same size, we can't reliably match without opening files
-                    # Just take the first one for now (could be improved)
-                    elif len(candidate_files) > 1 and filepath not in matched_files:
-                        filepath = candidate_files[0]
-                        matched_files.add(filepath)
-                        self.stats["by_size_only"] += 1
-                        self.log(
-                            f"    Matched by size (ambiguous): {size_bytes} bytes - {len(candidate_files)} candidates"
-                        )
+                if len(same_size) == 1:
+                    # Size uniquely identifies the file in the archive -> confident.
+                    filepath = unclaimed[0]
+                    matched_files.add(filepath)
+                    match_strategy[filepath] = "by_size_metadata"
+                    self.stats["by_size_metadata"] += 1
+                    self.log(f"    Matched by size (unique): {size_bytes} bytes")
+                    continue
+
+                # Multiple files share this size: size alone is not identifying.
+                # Disambiguate by gen_id, which often appears in the filename.
+                gen_matches = [
+                    fp
+                    for fp in unclaimed
+                    if gen_id and gen_id in os.path.basename(fp)
+                ]
+                if len(gen_matches) == 1:
+                    filepath = gen_matches[0]
+                    matched_files.add(filepath)
+                    match_strategy[filepath] = "by_size_metadata"
+                    self.stats["by_size_metadata"] += 1
+                    self.log(
+                        f"    Matched by size+gen_id: {size_bytes} bytes (gen_id {gen_id})"
+                    )
+                else:
+                    # Still ambiguous: take an unclaimed candidate so the image
+                    # isn't dropped, but tag it low-confidence.
+                    filepath = unclaimed[0]
+                    matched_files.add(filepath)
+                    match_strategy[filepath] = "by_size_ambiguous"
+                    self.stats["by_size_only"] += 1
+                    self.log(
+                        f"    Matched by size (ambiguous): {size_bytes} bytes - "
+                        f"{len(same_size)} candidates"
+                    )
 
             # Strategy 6: Match by asset_pointer size alone (for non-DALL-E)
             for asset_ref in references.get("asset_pointers", []):
@@ -162,6 +193,7 @@ class ComprehensiveMediaMatcher:
                         filepath = candidate_files[0]
                         if filepath not in matched_files:
                             matched_files.add(filepath)
+                            match_strategy[filepath] = "by_size_only"
                             self.stats["by_size_only"] += 1
                             self.log(f"    Matched by size: {size_bytes} bytes")
 
@@ -173,13 +205,15 @@ class ComprehensiveMediaMatcher:
                     if metadata["basename"] == filename:
                         if filepath not in matched_files:
                             matched_files.add(filepath)
+                            match_strategy[filepath] = "by_filename_only"
                             self.stats["by_filename_only"] += 1
                             self.log(f"    Matched by filename only: {filename}")
                             break
 
-            # Update conversation with matched files
+            # Update conversation with matched files and per-file provenance.
             if matched_files:
                 conv["_media_files"] = list(matched_files)
+                conv["_media_matches"] = match_strategy
                 self.stats["conversations_with_media"] += 1
                 self.stats["total_files_matched"] += len(matched_files)
                 self.log(
