@@ -133,29 +133,29 @@ class ComprehensiveMediaMatcher:
                 if not size_bytes:
                     continue
 
-                # Only consider files not already claimed by a stronger strategy.
-                candidate_files = [
-                    fp
-                    for fp in file_indices["size_to_paths"].get(size_bytes, [])
-                    if fp not in matched_files
-                ]
-                if not candidate_files:
+                # Confidence depends on how many files share this size in the
+                # whole archive, NOT on how many remain unclaimed. Otherwise the
+                # last unclaimed file of an ambiguous group would be mislabeled
+                # as a confident unique-size match.
+                same_size = file_indices["size_to_paths"].get(size_bytes, [])
+                unclaimed = [fp for fp in same_size if fp not in matched_files]
+                if not unclaimed:
                     continue
 
-                if len(candidate_files) == 1:
-                    # Unique by size -> confident match.
-                    filepath = candidate_files[0]
+                if len(same_size) == 1:
+                    # Size uniquely identifies the file in the archive -> confident.
+                    filepath = unclaimed[0]
                     matched_files.add(filepath)
                     match_strategy[filepath] = "by_size_metadata"
                     self.stats["by_size_metadata"] += 1
                     self.log(f"    Matched by size (unique): {size_bytes} bytes")
                     continue
 
-                # Multiple candidates share this size. Try to disambiguate using
-                # the gen_id, which often appears in the generated filename.
+                # Multiple files share this size: size alone is not identifying.
+                # Disambiguate by gen_id, which often appears in the filename.
                 gen_matches = [
                     fp
-                    for fp in candidate_files
+                    for fp in unclaimed
                     if gen_id and gen_id in os.path.basename(fp)
                 ]
                 if len(gen_matches) == 1:
@@ -167,17 +167,15 @@ class ComprehensiveMediaMatcher:
                         f"    Matched by size+gen_id: {size_bytes} bytes (gen_id {gen_id})"
                     )
                 else:
-                    # Still ambiguous. Keep the original behavior of taking the
-                    # first candidate so the image isn't dropped, but tag it as a
-                    # low-confidence match so it is auditable rather than silently
-                    # presented as certain.
-                    filepath = candidate_files[0]
+                    # Still ambiguous: take an unclaimed candidate so the image
+                    # isn't dropped, but tag it low-confidence.
+                    filepath = unclaimed[0]
                     matched_files.add(filepath)
                     match_strategy[filepath] = "by_size_ambiguous"
                     self.stats["by_size_only"] += 1
                     self.log(
                         f"    Matched by size (ambiguous): {size_bytes} bytes - "
-                        f"{len(candidate_files)} candidates"
+                        f"{len(same_size)} candidates"
                     )
 
             # Strategy 6: Match by asset_pointer size alone (for non-DALL-E)

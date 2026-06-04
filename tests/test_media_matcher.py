@@ -55,6 +55,19 @@ def test_match_records_hash_provenance():
     assert conv["_media_matches"]["/m/img.png"] == "by_file_hash"
 
 
+def test_match_unique_size_is_confident():
+    """A size shared by exactly one file in the archive is a confident match."""
+    matcher = ComprehensiveMediaMatcher()
+    conv = {"conversation_id": "c1"}
+    ext = FakeExtractor(_refs(dalle_generations=[{"size_bytes": 2000, "gen_id": None}]))
+    indices = _empty_indices()
+    indices["size_to_paths"][2000] = ["/m/only.png"]
+
+    matcher.match([conv], indices, ext)
+
+    assert conv["_media_matches"]["/m/only.png"] == "by_size_metadata"
+
+
 def test_match_gen_id_disambiguates_same_size():
     matcher = ComprehensiveMediaMatcher()
     conv = {"conversation_id": "c1"}
@@ -77,7 +90,24 @@ def test_match_ambiguous_size_tagged_low_confidence():
 
     matcher.match([conv], indices, ext)
 
-    # The image is still matched (no match dropped), but flagged as uncertain.
     assert len(conv["_media_files"]) == 1
     taken = conv["_media_files"][0]
     assert conv["_media_matches"][taken] == "by_size_ambiguous"
+
+
+def test_match_multiple_same_size_refs_all_ambiguous():
+    """Two references sharing a non-unique size must BOTH stay low-confidence —
+    consuming the first candidate must not make the second look 'unique'."""
+    matcher = ComprehensiveMediaMatcher()
+    conv = {"conversation_id": "c1"}
+    ext = FakeExtractor(_refs(dalle_generations=[
+        {"size_bytes": 1000, "gen_id": None},
+        {"size_bytes": 1000, "gen_id": None},
+    ]))
+    indices = _empty_indices()
+    indices["size_to_paths"][1000] = ["/m/aaa.png", "/m/bbb.png"]
+
+    matcher.match([conv], indices, ext)
+
+    assert len(conv["_media_files"]) == 2
+    assert set(conv["_media_matches"].values()) == {"by_size_ambiguous"}
