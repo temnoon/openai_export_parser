@@ -88,3 +88,31 @@ def test_footer_attribution_points_to_real_repo(generator):
 def test_viewer_backfills_children_from_parent(generator):
     html = generator.generate_conversation_html(conversation=_minimal_conversation())
     assert "backfill-children" in html  # parent-only exports must still render
+
+
+def test_index_embedded_titles_are_escaped(generator):
+    """A conversation title containing '</script>' must not break out of the
+    index page's embedded data block."""
+    conv = {
+        "title": "x</script><img src=x onerror=alert(1)>",
+        "create_time": 1700000000,
+        "conversation_id": "11111111-1111-1111-1111-111111111111",
+        "mapping": {},
+        "_folder_name": "2023-01-01_x_00001",
+    }
+    html = generator.generate_index_html([conv], "/tmp/out")
+    assert "</script><img src=x onerror=alert(1)>" not in html
+
+
+def test_index_embedded_titles_are_escaped(generator):
+    """A conversation title containing '</script>' must not break out of the
+    index page's embedded data block."""
+    conv = {
+        "title": "x</script><img src=x onerror=alert(1)>",
+        "create_time": 1700000000,
+        "conversation_id": "11111111-1111-1111-1111-111111111111",
+        "mapping": {},
+        "_folder_name": "2023-01-01_x_00001",
+    }
+    html = generator.generate_index_html([conv], "/tmp/out")
+    assert "</script><img src=x onerror=alert(1)>" not in html

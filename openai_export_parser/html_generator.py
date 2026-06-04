@@ -1458,10 +1458,9 @@ class HTMLGenerator:
         # Sort by create_time (newest first)
         conv_list.sort(key=lambda x: x["create_time"] or 0, reverse=True)
 
-        # Serialize conversation data for JavaScript
-        import json as json_lib
-
-        conversations_json = json_lib.dumps(conv_list, ensure_ascii=False)
+        # Serialize conversation data for JavaScript. Route through _embed_json
+        # so a title containing "</script>" cannot break out of the script block.
+        conversations_json = self._embed_json(conv_list)
 
         # Generate HTML cards (JavaScript will handle filtering)
         conversations_html = ""
